@@ -1,0 +1,130 @@
+<div class="mb-4">
+  <h4 class="fw-bold mb-1">Cài Đặt Hệ Thống</h4>
+  <p class="text-muted small mb-0">Cấu hình kết nối Google Gemini AI, thông số đăng bài Facebook và thiết lập ứng dụng</p>
+</div>
+
+<div class="row g-4">
+  <!-- Main Settings Form -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-transparent py-3 border-bottom">
+        <h6 class="fw-bold mb-0"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>Cấu Hình Google Gemini AI</h6>
+      </div>
+      <div class="card-body p-4">
+        <form action="/settings/save" method="POST">
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Google Gemini API Key</label>
+            <div class="input-group">
+              <input type="password" id="geminiApiKey" name="gemini_api_key" class="form-control font-monospace" 
+                     value="<%= settings.gemini_api_key %>" placeholder="AIzaSy...">
+              <button class="btn btn-outline-secondary" type="button" onclick="toggleApiKeyVisibility()">
+                <i class="bi bi-eye" id="toggleEyeIcon"></i>
+              </button>
+              <button class="btn btn-outline-primary" type="button" onclick="testGeminiConnection()">
+                <i class="bi bi-check-circle me-1"></i> Kiểm Tra Key
+              </button>
+            </div>
+            <div class="form-text">
+              Key dùng để gọi mô hình Gemini viết bài BĐS tiếng Việt tự động. Nếu để trống trên môi trường phát triển, hệ thống tự động nhận diện từ biến môi trường hoặc sử dụng bộ mẫu tối ưu hóa.
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Mô Hình Gemini Sử Dụng</label>
+            <select name="gemini_model" class="form-select">
+              <option value="gemini-2.5-flash" <%= settings.gemini_model === 'gemini-2.5-flash' ? 'selected' : '' %>>Gemini 2.5 Flash (Nhanh, thông minh, tối ưu chi phí & thời gian phản hồi)</option>
+              <option value="gemini-2.5-pro" <%= settings.gemini_model === 'gemini-2.5-pro' ? 'selected' : '' %>>Gemini 2.5 Pro (Sáng tạo chuyên sâu, lập luận phức tạp)</option>
+            </select>
+          </div>
+
+          <hr class="my-4">
+
+          <h6 class="fw-bold mb-3"><i class="fa-brands fa-facebook text-primary me-2"></i>Thông Số Tự Động Hóa Facebook</h6>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Thời gian giãn cách đăng bài (giây)</label>
+              <input type="number" name="post_delay_seconds" class="form-control" value="<%= settings.post_delay_seconds || 15 %>" min="2" max="180">
+              <div class="form-text">Khoảng nghỉ giữa 2 lần đăng nhóm liên tiếp nhằm tránh checkpoint chống spam.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tự động kiểm tra Live tài khoản</label>
+              <select name="auto_check_live" class="form-select">
+                <option value="true" <%= settings.auto_check_live ? 'selected' : '' %>>Bật (Khuyên dùng)</option>
+                <option value="false" <%= !settings.auto_check_live ? 'selected' : '' %>>Tắt</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">User-Agent trình duyệt mặc định</label>
+              <input type="text" name="user_agent" class="form-control font-monospace text-muted" value="<%= settings.user_agent %>">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-gradient-primary rounded-pill px-4 fw-bold shadow-sm">
+            <i class="bi bi-save me-1"></i> Lưu Cấu Hình Hệ Thống
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Information & Reset Card -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 mb-4 bg-body-tertiary">
+      <div class="card-body p-4">
+        <h6 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>Hướng Dẫn Sử Dụng</h6>
+        <ol class="ps-3 small text-muted mb-4 d-flex flex-column gap-2">
+          <li><strong>Thêm bất động sản:</strong> Vào mục "Kho Bất Động Sản" để nhập dữ liệu nhà đất kèm ảnh, giá, pháp lý.</li>
+          <li><strong>Thêm tài khoản FB:</strong> Nhập Cookie / Token của các tài khoản Facebook dùng để đăng bài.</li>
+          <li><strong>Quét nhóm:</strong> Quét các nhóm BĐS mà tài khoản đã tham gia để tạo danh sách đăng bài.</li>
+          <li><strong>Viết bài AI:</strong> Nhấn nút "Viết Bài AI" tại bất kỳ BĐS nào, AI sẽ sáng tạo bài viết lôi cuốn và tự động phân phối lên các nhóm!</li>
+        </ol>
+
+        <hr>
+
+        <h6 class="fw-bold text-danger mb-2"><i class="bi bi-arrow-counterclockwise me-1"></i> Khôi Phục Dữ Liệu Gốc</h6>
+        <p class="small text-muted mb-3">Tải lại toàn bộ dữ liệu mẫu mẫu (BĐS, Tài khoản demo, Nhóm demo) phục vụ kiểm thử.</p>
+        <form action="/settings/reset-data" method="POST" onsubmit="return confirm('Bạn có chắc muốn khôi phục dữ liệu mẫu ban đầu? Toàn bộ thay đổi hiện tại sẽ được làm mới.');">
+          <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill w-100">
+            Khôi Phục Dữ Liệu Mẫu
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleApiKeyVisibility() {
+    const input = document.getElementById('geminiApiKey');
+    const icon = document.getElementById('toggleEyeIcon');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.className = 'bi bi-eye-slash';
+    } else {
+      input.type = 'password';
+      icon.className = 'bi bi-eye';
+    }
+  }
+
+  async function testGeminiConnection() {
+    const key = document.getElementById('geminiApiKey').value.trim();
+    showToast('Đang kết nối thử nghiệm tới Google Gemini API...', true);
+
+    try {
+      const res = await fetch('/settings/test-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: key })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Kết nối Google Gemini API thành công! Mô hình đã sẵn sàng.', true);
+      } else {
+        showToast('Lỗi kết nối: ' + (data.message || 'Key không hợp lệ'), false);
+      }
+    } catch (err) {
+      showToast('Lỗi kết nối máy chủ', false);
+    }
+  }
+</script>

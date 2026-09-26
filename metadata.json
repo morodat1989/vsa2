@@ -1,0 +1,6 @@
+{
+  "name": "FB Tool Management",
+  "description": "Quản lý Bất Động Sản & Mạng Xã Hội với công cụ AI tự động tạo bài đăng và quản trị tài khoản Facebook.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-bold text-gray-800">Kho Tin Bất Động Sản (Listings)</h2>
+        <button onclick="document.getElementById('addListingModal').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700 transition">
+            + Thêm BĐS Mới
+        </button>
+    </div>
+
+    <!-- Danh sách Listing -->
+    <div class="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left font-semibold">Mã Tin</th>
+                    <th class="px-6 py-3 text-left font-semibold">Tiêu Đề / Nội Dung AI Gen</th>
+                    <th class="px-6 py-3 text-left font-semibold">Loại</th>
+                    <th class="px-6 py-3 text-left font-semibold">Giá</th>
+                    <th class="px-6 py-3 text-left font-semibold">Diện Tích</th>
+                    <th class="px-6 py-3 text-left font-semibold">Ảnh</th>
+                    <th class="px-6 py-3 text-right font-semibold">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+                {% if listings %}
+                    {% for item in listings %}
+                    <tr>
+                        <td class="px-6 py-4 font-medium text-gray-900">{{ item.listing_code }}</td>
+                        <td class="px-6 py-4 text-gray-800 max-w-md whitespace-pre-wrap">{{ item.title }}</td>
+                        <td class="px-6 py-4 text-gray-600">{{ item.category }}</td>
+                        <td class="px-6 py-4 text-red-600 font-semibold">{{ item.price }}</td>
+                        <td class="px-6 py-4 text-gray-600">{{ item.area }}</td>
+                        <td class="px-6 py-4 text-gray-600">{{ item.images|length if item.images else 0 }} ảnh</td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <a href="#" class="text-blue-600 hover:underline">Sửa</a>
+                            <a href="/listings/{{ item.id }}/generate-ai" class="text-green-600 hover:underline">AI Gen</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">Chưa có bất động sản nào trong kho tin. Hãy bấm "Thêm BĐS Mới".</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal Thêm BĐS -->
+    <div id="addListingModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-lg max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-bold text-gray-800">Thêm Bất Động Sản Mới</h3>
+                <button onclick="document.getElementById('addListingModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700 font-bold">✕</button>
+            </div>
+            
+            <form action="/listings" method="POST" enctype="multipart/form-data" class="space-y-4 text-sm">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-medium text-gray-700">Mã tin (Listing Code)</label>
+                        <input type="text" name="listing_code" required placeholder="VD: HP001" class="mt-1 w-full border border-gray-300 rounded p-2">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700">Địa chỉ BĐS (Location)</label>
+                        <input type="text" name="location" required placeholder="VD: Trực Cát, Lê Chân, Hải Phòng" class="mt-1 w-full border border-gray-300 rounded p-2">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-medium text-gray-700">Danh mục</label>
+                        <select name="category" class="mt-1 w-full border border-gray-300 rounded p-2">
+                            <option value="Bán nhà">Bán nhà</option>
+                            <option value="Cho thuê nhà">Cho thuê nhà</option>
+                            <option value="Phòng trọ">Phòng trọ</option>
+                            <option value="Sang nhượng">Sang nhượng</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700">Tiêu đề gốc</label>
+                        <input type="text" name="title" required placeholder="VD: Bán nhà 45m² Miếu Hai Xã, Lê Chân" class="mt-1 w-full border border-gray-300 rounded p-2">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block font-medium text-gray-700">Giá</label>
+                        <input type="text" name="price" required placeholder="VD: 2,98 tỷ" class="mt-1 w-full border border-gray-300 rounded p-2">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700">Diện tích</label>
+                        <input type="text" name="area" required placeholder="VD: 40.3" class="mt-1 w-full border border-gray-300 rounded p-2">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700">Số tầng</label>
+                        <input type="number" name="floors" value="1" placeholder="VD: 4" class="mt-1 w-full border border-gray-300 rounded p-2">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block font-medium text-gray-700">Phòng ngủ</label>
+                        <input type="number" name="bedrooms" value="1" placeholder="VD: 3" class="mt-1 w-full border border-gray-300 rounded p-2">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700">Phòng WC</label>
+                        <input type="number" name="bathrooms" value="1" placeholder="VD: 3" class="mt-1 w-full border border-gray-300 rounded p-2">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700">Số điện thoại liên hệ</label>
+                        <input type="text" name="phone" value="0559.431.814" class="mt-1 w-full border border-gray-300 rounded p-2 bg-gray-50">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-gray-700">Mô tả chi tiết</label>
+                    <textarea name="description" rows="4" placeholder="Nhập thông tin chi tiết căn nhà..." class="mt-1 w-full border border-gray-300 rounded p-2"></textarea>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-gray-700">Tải lên nhiều hình ảnh (Chọn nhiều file)</label>
+                    <input type="file" name="images" multiple accept="image/*" class="mt-1 w-full border border-gray-300 rounded p-2 bg-gray-50">
+                    <p class="text-xs text-gray-500 mt-1">Giữ phím Ctrl/Cmd để chọn nhiều ảnh cùng lúc.</p>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-3 border-t">
+                    <button type="button" onclick="document.getElementById('addListingModal').classList.add('hidden')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">Hủy</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Lưu Bất Động Sản</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

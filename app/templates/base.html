@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Manager AI - Đạt VSA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <div class="w-64 bg-gray-900 text-white flex flex-col">
+            <div class="p-4 text-xl font-bold border-b border-gray-800 flex items-center justify-between">
+                <span>🤖 FB Manager AI</span>
+            </div>
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto text-sm">
+                <!-- 1. Dashboard -->
+                <a href="/" class="block py-2 px-3 rounded hover:bg-gray-800 transition">🏠 Dashboard</a>
+                
+                <!-- Nhóm Facebook -->
+                <div class="pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">FACEBOOK</div>
+                <a href="/accounts" class="block py-2 px-3 rounded hover:bg-gray-800 transition">👤 Accounts</a>
+                <a href="/groups" class="block py-2 px-3 rounded hover:bg-gray-800 transition">👥 Groups</a>
+                
+                <!-- Nhóm Bất Động Sản & Marketplace -->
+                <div class="pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">Bất Động Sản</div>
+                <a href="/listings" class="block py-2 px-3 rounded hover:bg-gray-800 transition">🏠 Kho Tin (Listings)</a>
+                <a href="/marketplace" class="block py-2 px-3 rounded hover:bg-gray-800 transition">🛒 Marketplace</a>
+                <a href="/content" class="block py-2 px-3 rounded hover:bg-gray-800 transition">📝 Content Library</a>
+                
+                <!-- Nhóm Hệ Thống -->
+                <div class="pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">Hệ Thống</div>
+                <a href="/calendar" class="block py-2 px-3 rounded hover:bg-gray-800 transition">📅 Lịch Đăng</a>
+                <a href="/history" class="block py-2 px-3 rounded hover:bg-gray-800 transition">📜 Lịch Sử</a>
+                <a href="/settings" class="block py-2 px-3 rounded hover:bg-gray-800 transition">⚙ Settings</a>
+            </nav>
+            
+            <!-- Sidebar Footer - Vị trí đặt dấu ấn bản quyền chuyên nghiệp -->
+            <div class="p-3 border-t border-gray-800 text-xs text-gray-400 text-center bg-gray-950">
+                ✨ Dev by: <span class="text-blue-400 font-semibold">Đạt VSA</span>
+            </div>
+        </div>
+
+        <!-- Main Content Wrapper -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white shadow-sm border-b h-16 flex items-center justify-between px-6">
+                <h1 class="text-lg font-semibold text-gray-800">Quản lý Bất Động Sản & Mạng Xã Hội</h1>
+                <div class="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full border">
+                    AI Provider: <span class="font-medium text-blue-600">Gemini AI</span>
+                </div>
+            </header>
+            <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+</body>
+</html>

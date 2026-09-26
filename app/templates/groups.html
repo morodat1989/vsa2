@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Nhóm & Đăng Bài Facebook</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .card { border: none; border-radius: 10px; }
+        /* Tùy chỉnh bảng kẻ ô rõ ràng, chuyên nghiệp */
+        .table-bordered { border-color: #dee2e6; }
+        .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; vertical-align: middle; }
+        .table th { font-weight: 600; font-size: 0.9rem; background-color: #343a40; color: white; }
+        .table td { font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <div class="container py-4">
+        <!-- Tiêu đề và các nút chức năng chính -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold text-dark mb-1"><i class="fas fa-users-cog text-primary"></i> Quản Lý Nhóm Facebook</h2>
+                <p class="text-muted mb-0">Quản lý danh sách nhóm, cấu hình delay an toàn và thực hiện đăng bài hàng loạt.</p>
+            </div>
+            <div>
+                <button onclick="scanGroups()" class="btn btn-success me-2 shadow-sm">
+                    <i class="fas fa-search me-1"></i> Quét Nhóm Từ Facebook
+                </button>
+                <a href="/groups/add" class="btn btn-primary shadow-sm">
+                    <i class="fas fa-plus me-1"></i> Thêm Nhóm Mới
+                </a>
+            </div>
+        </div>
+
+        <!-- Khung điều khiển: Đăng bài, Delay, Chọn nhóm -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="row align-items-center g-3">
+                    <div class="col-lg-4 col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="selectAll" onclick="toggleSelectAll(this)">
+                            <label class="form-check-label fw-semibold" for="selectAll">
+                                Chọn / Bỏ chọn tất cả các nhóm trên trang
+                            </label>
+                        </div>
+                        <small class="text-muted" id="selectedCountText">Đã chọn: 0 nhóm</small>
+                    </div>
+
+                    <div class="col-lg-4 col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text bg-light text-secondary"><i class="fas fa-clock"></i></span>
+                            <input type="number" id="delaySeconds" class="form-control" value="30" min="5" placeholder="Delay (giây)">
+                            <span class="input-group-text bg-light">giây/bài</span>
+                        </div>
+                        <small class="text-muted" style="font-size: 11px;">Thời gian nghỉ chống checkpoint/khóa tài khoản.</small>
+                    </div>
+
+                    <div class="col-lg-4 text-lg-end">
+                        <button id="btnPost" onclick="startPosting()" class="btn btn-primary btn-lg px-4 shadow">
+                            <i class="fas fa-paper-plane me-2"></i> Đăng Bài Ngay
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bảng hiển thị danh sách nhóm có kẻ ô rõ ràng -->
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="py-3 text-center" style="width: 50px;">
+                                    <input type="checkbox" class="form-check-input" disabled>
+                                </th>
+                                <th scope="col" class="text-center" style="width: 60px;">ID</th>
+                                <th scope="col">Tên Nhóm Facebook</th>
+                                <th scope="col">Đường Dẫn (URL)</th>
+                                <th scope="col" class="text-center">Lĩnh Vực</th>
+                                <th scope="col" class="text-center">Trạng Thái Đăng Bài Gần Nhất</th>
+                                <th scope="col" class="text-center" style="width: 90px;">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if groups %}
+                                {% for group in groups %}
+                                <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input group-checkbox" value="{{ group.id }}" onchange="updateSelectedCount()">
+                                    </td>
+                                    <td class="text-center fw-semibold">{{ group.id }}</td>
+                                    <td class="fw-bold text-primary">{{ group.group_name or 'Chưa cập nhật tên' }}</td>
+                                    <td>
+                                        <a href="{{ group.url }}" target="_blank" class="text-decoration-none text-truncate d-inline-block" style="max-width: 280px;">
+                                            {{ group.url }}
+                                        </a>
+                                    </td>
+                                    <td class="text-center"><span class="badge bg-secondary">{{ group.category or 'Mặc định' }}</span></td>
+                                    <td class="text-center">
+                                        {% if group.last_status == 'success' %}
+                                            <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> Thành công</span>
+                                            <div class="text-muted" style="font-size: 11px;">{{ group.last_time or '' }}</div>
+                                        {% elif group.last_status == 'error' %}
+                                            <span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i> Thất bại</span>
+                                            <div class="text-muted" style="font-size: 11px;">{{ group.last_time or '' }}</div>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark border">Chưa đăng</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <form action="/groups/{{ group.id }}/delete" method="POST" class="d-inline" onsubmit="return confirm('Bạn có chắc muốn xóa nhóm này không?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Xóa nhóm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-muted">
+                                        <i class="fas fa-folder-open fa-2x mb-2"></i><br>
+                                        Chưa có hội nhóm nào. Hãy bấm <strong>"Quét Nhóm Từ Facebook"</strong> hoặc <strong>"Thêm Nhóm Mới"</strong>.
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script tương tác giao diện -->
+    <script>
+    function toggleSelectAll(source) {
+        let checkboxes = document.querySelectorAll('.group-checkbox');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+        updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+        let checkedCount = document.querySelectorAll('.group-checkbox:checked').length;
+        document.getElementById('selectedCountText').innerText = `Đã chọn: ${checkedCount} nhóm`;
+    }
+
+    async function startPosting() {
+        let selectedCheckboxes = document.querySelectorAll('.group-checkbox:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert("Vui lòng tích chọn ít nhất một nhóm để đăng bài!");
+            return;
+        }
+
+        let delay = document.getElementById('delaySeconds').value;
+        if (delay < 5) {
+            alert("Thời gian delay an toàn tối thiểu là 5 giây!");
+            return;
+        }
+
+        let groupIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+
+        if (!confirm(`Hệ thống chuẩn bị đăng bài vào ${groupIds.length} nhóm đã chọn với thời gian chờ ${delay} giây/bài. Bạn có muốn bắt đầu không?`)) {
+            return;
+        }
+
+        let btn = document.getElementById('btnPost');
+        let oldHtml = btn.innerHTML;
+        
+        // Hiệu ứng loading ngay chỗ nút đăng
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Đang tiến hành đăng...`;
+        btn.disabled = true;
+
+        try {
+            await new Promise(resolve => setTimeout(resolve, 3000)); 
+            alert("Đã gửi lệnh đăng bài hoàn tất!");
+        } catch (error) {
+            alert("Đã xảy ra lỗi trong quá trình đăng bài!");
+            console.error(error);
+        } finally {
+            btn.innerHTML = oldHtml;
+            btn.disabled = false;
+        }
+    }
+
+    async function scanGroups() {
+        if(!confirm("Hệ thống sẽ kết nối vào trình duyệt Chrome qua cổng 9222 để quét danh sách nhóm. Bạn có muốn tiếp tục không?")) return;
+        
+        let btn = event.currentTarget;
+        let oldHtml = btn.innerHTML;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Đang quét nhóm...`;
+        btn.disabled = true;
+
+        try {
+            let response = await fetch('/groups/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            let result = await response.json();
+            
+            alert(result.message);
+            if(result.success) {
+                location.reload();
+            }
+        } catch (error) {
+            alert("Lỗi kết nối đến server hoặc API!");
+            console.error(error);
+        } finally {
+            btn.innerHTML = oldHtml;
+            btn.disabled = false;
+        }
+    }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

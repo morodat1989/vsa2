@@ -1,0 +1,204 @@
+<div class="row g-3 mb-4">
+  <!-- Stat Card: Listings -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card h-100 p-3 shadow-sm border-0 bg-body-tertiary">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <span class="text-muted small fw-semibold">Kho Bất Động Sản</span>
+          <h3 class="fw-bold my-1 text-primary"><%= stats.totalListings %></h3>
+          <span class="badge badge-soft-primary"><i class="bi bi-houses me-1"></i> Đang sẵn sàng</span>
+        </div>
+        <div class="rounded-4 p-3 bg-primary bg-opacity-10 text-primary fs-3">
+          <i class="fa-solid fa-hotel"></i>
+        </div>
+      </div>
+      <div class="mt-3 pt-2 border-top">
+        <a href="/listings" class="small text-decoration-none fw-semibold">Xem danh sách BĐS <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat Card: FB Accounts -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card h-100 p-3 shadow-sm border-0 bg-body-tertiary">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <span class="text-muted small fw-semibold">Tài Khoản Facebook</span>
+          <h3 class="fw-bold my-1 text-success"><%= stats.liveAccounts %> <small class="fs-6 text-muted font-normal">/ <%= stats.totalAccounts %></small></h3>
+          <span class="badge badge-soft-success"><i class="bi bi-check-circle me-1"></i> <%= stats.liveAccounts %> nick đang Live</span>
+        </div>
+        <div class="rounded-4 p-3 bg-success bg-opacity-10 text-success fs-3">
+          <i class="fa-brands fa-facebook"></i>
+        </div>
+      </div>
+      <div class="mt-3 pt-2 border-top">
+        <a href="/facebook/accounts" class="small text-decoration-none fw-semibold">Quản lý tài khoản <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat Card: FB Groups -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card h-100 p-3 shadow-sm border-0 bg-body-tertiary">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <span class="text-muted small fw-semibold">Nhóm Facebook Đã Quét</span>
+          <h3 class="fw-bold my-1 text-info"><%= stats.totalGroups %></h3>
+          <span class="badge badge-soft-primary"><i class="bi bi-people-fill me-1"></i> Mục tiêu đăng bài</span>
+        </div>
+        <div class="rounded-4 p-3 bg-info bg-opacity-10 text-info fs-3">
+          <i class="fa-solid fa-users-rectangle"></i>
+        </div>
+      </div>
+      <div class="mt-3 pt-2 border-top">
+        <a href="/facebook/groups" class="small text-decoration-none fw-semibold">Xem danh sách nhóm <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat Card: Total Posts -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card h-100 p-3 shadow-sm border-0 bg-body-tertiary">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <span class="text-muted small fw-semibold">Bài Đăng Đã Xuất Bản</span>
+          <h3 class="fw-bold my-1 text-warning"><%= stats.successfulPosts %></h3>
+          <span class="badge badge-soft-warning"><i class="bi bi-send-check me-1"></i> Hoàn thành tự động</span>
+        </div>
+        <div class="rounded-4 p-3 bg-warning bg-opacity-10 text-warning fs-3">
+          <i class="fa-solid fa-share-nodes"></i>
+        </div>
+      </div>
+      <div class="mt-3 pt-2 border-top">
+        <a href="/facebook/logs" class="small text-decoration-none fw-semibold">Xem lịch sử log <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Action Strip -->
+<div class="card shadow-sm border-0 mb-4 bg-body">
+  <div class="card-body p-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-2">
+        <div class="p-2 rounded-3 bg-primary bg-opacity-10 text-primary">
+          <i class="fa-solid fa-bolt fs-5"></i>
+        </div>
+        <div>
+          <h6 class="mb-0 fw-bold">Thao Tác Nhanh</h6>
+          <small class="text-muted">Chọn hành động để quản lý kho hàng và tự động hoá</small>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="/listings" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+          <i class="bi bi-plus-lg me-1"></i> Thêm Bất Động Sản
+        </a>
+        <a href="/facebook/accounts" class="btn btn-outline-success btn-sm rounded-pill px-3">
+          <i class="fa-brands fa-facebook-f me-1"></i> Thêm Tài Khoản FB
+        </a>
+        <a href="/facebook/groups" class="btn btn-outline-info btn-sm rounded-pill px-3">
+          <i class="bi bi-arrow-repeat me-1"></i> Quét Lại Nhóm
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Recent Properties for quick AI post -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-wand-magic-sparkles text-primary"></i>
+          <h6 class="mb-0 fw-bold">Kho Bất Động Sản Sẵn Sàng Đăng Tin AI</h6>
+        </div>
+        <a href="/listings" class="small text-decoration-none">Xem tất cả (<%= stats.totalListings %>)</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Bất Động Sản</th>
+                <th>Giá / Diện Tích</th>
+                <th>Liên Hệ</th>
+                <th class="text-end pe-3">Hành Động</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (recentListings && recentListings.length > 0) { %>
+                <% recentListings.forEach(item => { %>
+                  <tr>
+                    <td class="ps-3">
+                      <div class="fw-bold text-truncate" style="max-width: 250px;"><%= item.title %></div>
+                      <div class="small text-muted text-truncate" style="max-width: 250px;">
+                        <i class="bi bi-geo-alt me-1"></i><%= item.address %>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="fw-bold text-danger"><%= item.price ? item.price + ' Tỷ' : 'Thỏa thuận' %></div>
+                      <div class="small text-muted"><%= item.area ? item.area + ' m²' : '' %> <%= item.bedrooms ? '• ' + item.bedrooms + ' PN' : '' %></div>
+                    </td>
+                    <td>
+                      <div class="small fw-semibold"><%= item.contact_name || 'Chính chủ' %></div>
+                      <div class="small text-muted"><%= item.contact_phone || '---' %></div>
+                    </td>
+                    <td class="text-end pe-3">
+                      <a href="/facebook/ai-write/<%= item.id %>" class="btn btn-sm btn-gradient-primary rounded-pill px-3 shadow-sm">
+                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Đăng AI
+                      </a>
+                    </td>
+                  </tr>
+                <% }); %>
+              <% } else { %>
+                <tr>
+                  <td colspan="4" class="text-center py-4 text-muted">Chưa có bất động sản nào trong kho. <a href="/listings">Thêm mới ngay</a></td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Post Activity Logs -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left text-primary"></i>
+          <h6 class="mb-0 fw-bold">Nhật Ký Đăng Bài Gần Đây</h6>
+        </div>
+        <a href="/facebook/logs" class="small text-decoration-none">Xem toàn bộ</a>
+      </div>
+      <div class="card-body p-3">
+        <% if (recentLogs && recentLogs.length > 0) { %>
+          <div class="d-flex flex-column gap-3">
+            <% recentLogs.slice(0, 5).forEach(log => { %>
+              <div class="p-2.5 rounded-3 bg-body-tertiary border">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <span class="badge <%= log.status === 'success' ? 'badge-soft-success' : 'badge-soft-danger' %>">
+                    <i class="bi <%= log.status === 'success' ? 'bi-check2' : 'bi-x' %> me-1"></i>
+                    <%= log.status === 'success' ? 'Thành công' : 'Thất bại' %>
+                  </span>
+                  <small class="text-muted" style="font-size: 0.75rem;"><%= new Date(log.created_at).toLocaleString('vi-VN') %></small>
+                </div>
+                <div class="fw-semibold small text-truncate"><%= log.listing_title || 'Bài đăng' %></div>
+                <div class="small text-muted text-truncate">
+                  <i class="fa-brands fa-facebook text-primary me-1"></i> <%= log.account_name %> &rarr; <strong><%= log.group_name %></strong>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+            Chưa có lịch sử đăng bài nào. Hãy chọn một BĐS và nhấn "Đăng AI" để bắt đầu!
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>

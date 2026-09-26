@@ -1,0 +1,444 @@
+<div class="mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <a href="/listings" class="btn btn-sm btn-outline-secondary rounded-pill mb-2">
+        <i class="bi bi-arrow-left me-1"></i> Trở về kho BĐS
+      </a>
+      <h4 class="fw-bold mb-0">Soạn Bài Đăng Bất Động Sản Bằng AI & Tự Động Đăng Facebook</h4>
+    </div>
+    <span class="badge badge-soft-primary px-3 py-2 fs-6 rounded-pill">
+      <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Google Gemini AI
+    </span>
+  </div>
+</div>
+
+<!-- Property Info Card Banner -->
+<div class="card shadow-sm border-0 mb-4 bg-body-tertiary">
+  <div class="card-body p-3 p-md-4">
+    <div class="row align-items-center g-3">
+      <div class="col-auto">
+        <img src="<%= listing.images || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&auto=format&fit=crop&q=80' %>" 
+             class="rounded-3 object-fit-cover shadow-sm" style="width: 100px; height: 80px;" alt="<%= listing.title %>">
+      </div>
+      <div class="col">
+        <h5 class="fw-bold mb-1 text-primary"><%= listing.title %></h5>
+        <div class="small text-muted mb-2"><i class="bi bi-geo-alt-fill text-danger me-1"></i><%= listing.address %></div>
+        <div class="d-flex flex-wrap gap-2">
+          <span class="badge bg-danger fs-6"><%= listing.price ? listing.price + ' Tỷ' : 'Thỏa thuận' %></span>
+          <% if (listing.area) { %><span class="badge bg-secondary"><%= listing.area %> m²</span><% } %>
+          <% if (listing.bedrooms) { %><span class="badge bg-secondary"><%= listing.bedrooms %> PN</span><% } %>
+          <% if (listing.legal) { %><span class="badge bg-secondary"><%= listing.legal %></span><% } %>
+          <span class="badge bg-success"><i class="bi bi-telephone me-1"></i><%= listing.contact_phone || 'Liên hệ' %> (<%= listing.contact_name || 'Chính chủ' %>)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: AI Content Generator & Editor -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent py-3 border-bottom">
+        <div class="d-flex align-items-center justify-content-between">
+          <h6 class="fw-bold mb-0"><i class="fa-solid fa-feather-pointed text-primary me-2"></i>Nội Dung Bài Đăng Do AI Tạo</h6>
+          <span class="badge badge-soft-success" id="contentStatusBadge">Tạo thành công</span>
+        </div>
+      </div>
+      <div class="card-body p-3 p-md-4">
+        <!-- Style selection & prompt controls -->
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted text-uppercase">Chọn phong cách bài viết:</label>
+          <div class="btn-group w-100 mb-2" role="group">
+            <input type="radio" class="btn-check" name="aiStyle" id="style_engaging" value="engaging" checked onchange="regenerateAI()">
+            <label class="btn btn-outline-primary btn-sm py-2" for="style_engaging">
+              🔥 Hấp Dẫn & Giật Tít
+            </label>
+
+            <input type="radio" class="btn-check" name="aiStyle" id="style_urgent" value="urgent" onchange="regenerateAI()">
+            <label class="btn btn-outline-primary btn-sm py-2" for="style_urgent">
+              ⚡ Cần Bán Gấp (Ngộp)
+            </label>
+
+            <input type="radio" class="btn-check" name="aiStyle" id="style_professional" value="professional" onchange="regenerateAI()">
+            <label class="btn btn-outline-primary btn-sm py-2" for="style_professional">
+              🏢 Chuyên Nghiệp / Cao Cấp
+            </label>
+          </div>
+
+          <div class="input-group">
+            <input type="text" id="customInstructions" class="form-control form-control-sm" placeholder="Yêu cầu thêm cho AI (ví dụ: nhấn mạnh chiết khấu 5%, thêm hashtag Vinhomes...)">
+            <button class="btn btn-sm btn-primary" type="button" id="btnRegenerate" onclick="regenerateAI()">
+              <i class="fa-solid fa-arrows-rotate me-1"></i> Tạo Lại
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick emoji toolbar -->
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('🔥')">🔥</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('🏡')">🏡</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('📍')">📍</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('💎')">💎</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('💰')">💰</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('📞')">📞</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('✅')">✅</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('⚡')">⚡</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="insertEmoji('👉')">👉</button>
+          <button type="button" class="btn btn-sm btn-light border py-0 px-2 ms-auto" onclick="copyContent()">
+            <i class="bi bi-clipboard me-1"></i> Sao chép
+          </button>
+        </div>
+
+        <!-- Textarea Editor -->
+        <div class="position-relative">
+          <textarea id="postContent" class="form-control font-monospace" rows="14" style="font-size: 0.92rem; line-height: 1.6;" oninput="updateWordCount()"><%= generatedContent %></textarea>
+          <div id="aiLoadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 bg-body bg-opacity-75 d-none flex-column align-items-center justify-content-center rounded">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <span class="fw-semibold text-primary">Gemini AI đang sáng tạo nội dung...</span>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-2 text-muted small">
+          <span id="charCount">Ký tự: 0 | Từ: 0</span>
+          <span>Nội dung đã tối ưu hóa tương tác Facebook</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Facebook Account & Target Groups -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent py-3 border-bottom">
+        <h6 class="fw-bold mb-0"><i class="fa-brands fa-facebook text-primary me-2"></i>Cấu Hình Đăng Tin Tự Động</h6>
+      </div>
+      <div class="card-body p-3 p-md-4">
+        <!-- Account select -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">1. Chọn Tài Khoản Facebook Đăng Tin:</label>
+          <select id="accountSelect" class="form-select" onchange="changeAccount(this.value)">
+            <% if (accounts && accounts.length > 0) { %>
+              <% accounts.forEach(acc => { %>
+                <option value="<%= acc.id %>" <%= (selectedAccount && selectedAccount.id === acc.id) ? 'selected' : '' %>>
+                  <%= acc.name %> (<%= acc.live_status === 'live' ? '🟢 Live' : '⚪ ' + acc.live_status %> - <%= acc.groups_count || 0 %> nhóm)
+                </option>
+              <% }); %>
+            <% } else { %>
+              <option value="">Chưa có tài khoản Facebook nào</option>
+            <% } %>
+          </select>
+          <% if (!accounts || accounts.length === 0) { %>
+            <div class="small text-danger mt-1">
+              Bạn chưa có tài khoản Facebook nào. <a href="/facebook/accounts">Thêm tài khoản ngay</a>.
+            </div>
+          <% } %>
+        </div>
+
+        <!-- Groups select -->
+        <div class="mb-3">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <label class="form-label fw-semibold mb-0">2. Chọn Nhóm Đăng Bài:</label>
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="selectAllGroups(true)">Chọn tất cả</button>
+              <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="selectAllGroups(false)">Bỏ chọn</button>
+            </div>
+          </div>
+
+          <div class="input-group input-group-sm mb-2">
+            <span class="input-group-text bg-transparent"><i class="bi bi-search"></i></span>
+            <input type="text" id="groupFilterInput" class="form-control" placeholder="Lọc nhóm theo tên..." onkeyup="filterGroupsList()">
+          </div>
+
+          <!-- Groups container -->
+          <div class="border rounded p-2 overflow-y-auto bg-body-tertiary" style="max-height: 280px;" id="groupsListContainer">
+            <% if (groups && groups.length > 0) { %>
+              <% groups.forEach((grp, idx) => { %>
+                <div class="form-check p-2 rounded hover-bg group-item mb-1 border-bottom" data-name="<%= grp.name.toLowerCase() %>">
+                  <input class="form-check-input group-checkbox" type="checkbox" value="<%= grp.group_id %>" id="grp_<%= grp.id %>" checked>
+                  <label class="form-check-label w-100 cursor-pointer" for="grp_<%= grp.id %>">
+                    <div class="fw-semibold text-truncate small" style="max-width: 320px;"><%= grp.name %></div>
+                    <div class="d-flex gap-2 text-muted" style="font-size: 0.75rem;">
+                      <span><i class="bi bi-people me-1"></i><%= grp.member_count ? Number(grp.member_count).toLocaleString('vi-VN') : '---' %> thành viên</span>
+                      <span>•</span>
+                      <span class="<%= grp.post_permission === 'auto_approve' ? 'text-success' : 'text-warning' %>">
+                        <%= grp.post_permission === 'auto_approve' ? 'Duyệt tự động' : 'Chờ phê duyệt' %>
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              <% }); %>
+            <% } else { %>
+              <div class="p-4 text-center text-muted small">
+                Tài khoản này chưa có danh sách nhóm.<br>
+                <a href="/facebook/groups" class="fw-semibold">Nhấn vào đây để quét nhóm cho tài khoản</a>
+              </div>
+            <% } %>
+          </div>
+          <div class="small text-muted mt-1" id="selectedGroupsCount">Đã chọn: <%= groups ? groups.length : 0 %> nhóm</div>
+        </div>
+
+        <!-- Delay settings -->
+        <div class="row g-2 mb-4">
+          <div class="col-6">
+            <label class="form-label small fw-semibold text-muted">Khoảng cách mỗi bài (giây):</label>
+            <input type="number" id="postDelay" class="form-control form-control-sm" value="5" min="2" max="120">
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-semibold text-muted">Định dạng đăng:</label>
+            <select id="postType" class="form-select form-select-sm">
+              <option value="text">Chỉ văn bản</option>
+              <option value="text_with_images" <%= listing.images ? 'selected' : '' %>>Văn bản + Hình ảnh BĐS</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Big Post Button -->
+        <button class="btn btn-gradient-primary w-100 py-3 rounded-pill fw-bold fs-6 shadow" id="btnStartPost" onclick="startPostingProcess()">
+          <i class="fa-solid fa-paper-plane me-2"></i> Bắt Đầu Đăng Lên Facebook
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Tiến Trình Đăng Bài Real-Time -->
+<div class="modal fade" id="postProgressModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-satellite-dish text-primary me-2"></i>Tiến Trình Đăng Tin Tự Động</h5>
+      </div>
+      <div class="modal-body p-4">
+        <div class="text-center mb-3">
+          <h6 class="fw-bold mb-1" id="progressStatusText">Đang chuẩn bị dữ liệu bài đăng...</h6>
+          <small class="text-muted" id="progressDetailsText">Khởi tạo kết nối API Facebook...</small>
+        </div>
+
+        <div class="progress mb-3" style="height: 12px;">
+          <div id="postingProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
+        </div>
+
+        <div class="border rounded p-2 overflow-y-auto bg-body-tertiary" style="max-height: 180px;" id="postingLogStream">
+          <!-- Logs appear here dynamically -->
+        </div>
+      </div>
+      <div class="modal-footer border-top bg-body-tertiary">
+        <button type="button" class="btn btn-secondary rounded-pill px-4" id="btnCancelPost" onclick="cancelPosting()">Dừng lại</button>
+        <a href="/facebook/logs" class="btn btn-gradient-primary rounded-pill px-4 fw-bold d-none" id="btnDoneViewLogs">Xem Lịch Sử</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const listingId = <%= listing.id %>;
+  let isPosting = false;
+
+  function updateWordCount() {
+    const text = document.getElementById('postContent').value;
+    const charCount = text.length;
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    document.getElementById('charCount').textContent = `Ký tự: ${charCount} | Từ: ${words}`;
+  }
+  updateWordCount();
+
+  function insertEmoji(emoji) {
+    const textarea = document.getElementById('postContent');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + emoji + text.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+    textarea.focus();
+    updateWordCount();
+  }
+
+  function copyContent() {
+    const text = document.getElementById('postContent').value;
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Đã sao chép nội dung bài viết!', true);
+    });
+  }
+
+  async function regenerateAI() {
+    const overlay = document.getElementById('aiLoadingOverlay');
+    const style = document.querySelector('input[name="aiStyle"]:checked').value;
+    const custom = document.getElementById('customInstructions').value;
+    const statusBadge = document.getElementById('contentStatusBadge');
+
+    overlay.classList.remove('d-none');
+    overlay.classList.add('d-flex');
+    statusBadge.textContent = 'Đang xử lý...';
+    statusBadge.className = 'badge badge-soft-warning';
+
+    try {
+      const res = await fetch('/facebook/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: listingId,
+          style: style,
+          custom_instructions: custom
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.content) {
+        document.getElementById('postContent').value = data.content;
+        updateWordCount();
+        statusBadge.textContent = 'Tạo thành công';
+        statusBadge.className = 'badge badge-soft-success';
+        showToast('Gemini AI đã tạo nội dung mới!', true);
+      } else {
+        showToast(data.message || 'Lỗi khi tạo nội dung', false);
+      }
+    } catch (err) {
+      showToast('Lỗi kết nối máy chủ', false);
+    } finally {
+      overlay.classList.add('d-none');
+      overlay.classList.remove('d-flex');
+    }
+  }
+
+  function changeAccount(accId) {
+    window.location.href = `/facebook/ai-write/${listingId}?account_id=${accId}`;
+  }
+
+  function selectAllGroups(check) {
+    document.querySelectorAll('.group-checkbox').forEach(cb => {
+      if (cb.closest('.group-item').style.display !== 'none') {
+        cb.checked = check;
+      }
+    });
+    updateSelectedCount();
+  }
+
+  function updateSelectedCount() {
+    const count = document.querySelectorAll('.group-checkbox:checked').length;
+    document.getElementById('selectedGroupsCount').textContent = `Đã chọn: ${count} nhóm`;
+  }
+
+  document.querySelectorAll('.group-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateSelectedCount);
+  });
+
+  function filterGroupsList() {
+    const q = document.getElementById('groupFilterInput').value.toLowerCase().trim();
+    document.querySelectorAll('.group-item').forEach(el => {
+      const name = el.getAttribute('data-name') || '';
+      el.style.display = (!q || name.includes(q)) ? 'block' : 'none';
+    });
+    updateSelectedCount();
+  }
+
+  // Real-time batch post execution
+  let progressModal = null;
+  let abortPosting = false;
+
+  async function startPostingProcess() {
+    const accountId = document.getElementById('accountSelect').value;
+    if (!accountId) {
+      showToast('Vui lòng chọn hoặc thêm một tài khoản Facebook trước khi đăng bài!', false);
+      return;
+    }
+
+    const checkedBoxes = Array.from(document.querySelectorAll('.group-checkbox:checked'));
+    if (checkedBoxes.length === 0) {
+      showToast('Vui lòng chọn ít nhất một nhóm Facebook để đăng bài!', false);
+      return;
+    }
+
+    const content = document.getElementById('postContent').value.trim();
+    if (!content) {
+      showToast('Nội dung bài đăng không được để trống!', false);
+      return;
+    }
+
+    const delay = parseInt(document.getElementById('postDelay').value) || 3;
+    const postType = document.getElementById('postType').value;
+
+    abortPosting = false;
+    isPosting = true;
+
+    // Open Modal
+    progressModal = new bootstrap.Modal(document.getElementById('postProgressModal'));
+    progressModal.show();
+
+    const progressBar = document.getElementById('postingProgressBar');
+    const statusText = document.getElementById('progressStatusText');
+    const detailsText = document.getElementById('progressDetailsText');
+    const logStream = document.getElementById('postingLogStream');
+    const btnCancel = document.getElementById('btnCancelPost');
+    const btnDone = document.getElementById('btnDoneViewLogs');
+
+    btnCancel.classList.remove('d-none');
+    btnDone.classList.add('d-none');
+    logStream.innerHTML = '';
+    progressBar.style.width = '0%';
+
+    const total = checkedBoxes.length;
+    let completed = 0;
+
+    for (let i = 0; i < total; i++) {
+      if (abortPosting) {
+        logStream.innerHTML += `<div class="text-warning small py-1"><i class="bi bi-exclamation-triangle me-1"></i> Quá trình đăng bài đã bị dừng bởi người dùng.</div>`;
+        break;
+      }
+
+      const groupId = checkedBoxes[i].value;
+      const groupName = checkedBoxes[i].closest('.group-item').querySelector('.fw-semibold').textContent;
+
+      statusText.textContent = `Đang đăng nhóm ${i + 1}/${total}`;
+      detailsText.textContent = `Nhóm: ${groupName}`;
+
+      try {
+        const res = await fetch('/facebook/post-single', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            account_id: accountId,
+            group_id: groupId,
+            content: content,
+            listing_id: listingId,
+            post_type: postType
+          })
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          logStream.innerHTML += `<div class="text-success small py-1"><i class="bi bi-check-circle-fill me-1"></i> Thành công: <strong>${groupName}</strong> (ID: ${result.postId})</div>`;
+        } else {
+          logStream.innerHTML += `<div class="text-danger small py-1"><i class="bi bi-x-circle-fill me-1"></i> Thất bại: ${groupName} (${result.message})</div>`;
+        }
+      } catch (err) {
+        logStream.innerHTML += `<div class="text-danger small py-1"><i class="bi bi-x-circle-fill me-1"></i> Lỗi: ${groupName} (Lỗi mạng)</div>`;
+      }
+
+      completed++;
+      const percent = Math.round((completed / total) * 100);
+      progressBar.style.width = `${percent}%`;
+      progressBar.textContent = `${percent}%`;
+      logStream.scrollTop = logStream.scrollHeight;
+
+      // Delay between posts
+      if (i < total - 1 && !abortPosting) {
+        detailsText.textContent = `Đang chờ ${delay} giây trước khi đăng nhóm tiếp theo (chống checkpoint)...`;
+        await new Promise(r => setTimeout(r, delay * 1000));
+      }
+    }
+
+    statusText.textContent = `Hoàn tất đăng bài! (${completed}/${total} nhóm)`;
+    detailsText.textContent = 'Bài đăng đã được lưu vào hệ thống lịch sử.';
+    progressBar.classList.remove('progress-bar-animated');
+    btnCancel.classList.add('d-none');
+    btnDone.classList.remove('d-none');
+    isPosting = false;
+  }
+
+  function cancelPosting() {
+    abortPosting = true;
+    if (progressModal) {
+      progressModal.hide();
+    }
+  }
+</script>

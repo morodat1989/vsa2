@@ -1,0 +1,15 @@
+# Môi trường ảo & Rác Python
+venv/
+__pycache__/
+*.pyc
+
+# Chrome profiles & Dữ liệu cá nhân (Rất quan trọng để tránh lộ thông tin)
+chrome_profiles/
+profiles/
+data/
+Ungoogled Chromium/
+
+# File hệ thống & IDE
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,238 @@
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">Danh Sách Nhóm Facebook</h4>
+    <p class="text-muted small mb-0">Quản lý các hội nhóm bất động sản đã tham gia để phân phối bài đăng</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-primary rounded-pill px-3 shadow-sm" onclick="scanCurrentAccountGroups()">
+      <i class="bi bi-arrow-repeat me-1"></i> Quét Danh Sách Nhóm
+    </button>
+    <button class="btn btn-gradient-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal">
+      <i class="bi bi-plus-circle me-1"></i> Thêm Nhóm Mới
+    </button>
+  </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card shadow-sm border-0 mb-4 bg-body">
+  <div class="card-body p-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-4">
+        <label class="small text-muted fw-semibold">Lọc theo tài khoản:</label>
+        <select class="form-select form-select-sm" id="accountFilter" onchange="applyFilters()">
+          <option value="all">Tất cả tài khoản (<%= accounts.length %>)</option>
+          <% accounts.forEach(acc => { %>
+            <option value="<%= acc.id %>" <%= (selectedAccountId == acc.id) ? 'selected' : '' %>>
+              <%= acc.name %> (<%= acc.groups_count || 0 %> nhóm)
+            </option>
+          <% }); %>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="small text-muted fw-semibold">Quyền đăng bài:</label>
+        <select class="form-select form-select-sm" id="permissionFilter" onchange="applyFilters()">
+          <option value="all">Tất cả quyền duyệt</option>
+          <option value="auto_approve">Duyệt tự động (Tự do)</option>
+          <option value="pending">Phải chờ admin duyệt</option>
+        </select>
+      </div>
+
+      <div class="col-md-5">
+        <label class="small text-muted fw-semibold">Tìm kiếm nhóm:</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-transparent"><i class="bi bi-search"></i></span>
+          <input type="text" id="groupSearchInput" class="form-control" placeholder="Tìm theo tên nhóm hoặc ID..." onkeyup="applyFilters()">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Groups Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Tên Nhóm / ID</th>
+            <th>Quyền Phê Duyệt</th>
+            <th>Thành Viên</th>
+            <th>Quyền Riêng Tư</th>
+            <th>Tài Khoản Liên Kết</th>
+            <th class="text-end pe-4">Thao Tác</th>
+          </tr>
+        </thead>
+        <tbody id="groupsTableBody">
+          <% if (groups && groups.length > 0) { %>
+            <% groups.forEach(grp => { 
+                const acc = accounts.find(a => a.id === grp.account_id);
+            %>
+              <tr class="group-row" 
+                  data-name="<%= grp.name.toLowerCase() %>" 
+                  data-id="<%= grp.group_id %>"
+                  data-account="<%= grp.account_id %>"
+                  data-permission="<%= grp.post_permission %>">
+                <td class="ps-4">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-users text-primary fs-5"></i>
+                    <div>
+                      <a href="https://facebook.com/groups/<%= grp.group_id %>" target="_blank" class="fw-bold text-decoration-none text-body">
+                        <%= grp.name %> <i class="bi bi-box-arrow-up-right small text-muted" style="font-size: 0.75rem;"></i>
+                      </a>
+                      <div class="small text-muted font-monospace">ID: <%= grp.group_id %></div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span class="badge <%= grp.post_permission === 'auto_approve' ? 'badge-soft-success' : 'badge-soft-warning' %> px-2.5 py-1">
+                    <i class="bi <%= grp.post_permission === 'auto_approve' ? 'bi-check2-circle' : 'bi-shield-exclamation' %> me-1"></i>
+                    <%= grp.post_permission === 'auto_approve' ? 'Tự do đăng (Auto)' : 'Kiểm duyệt (Pending)' %>
+                  </span>
+                </td>
+                <td>
+                  <span class="fw-semibold"><%= grp.member_count ? Number(grp.member_count).toLocaleString('vi-VN') : '---' %></span>
+                </td>
+                <td>
+                  <span class="badge bg-body-secondary text-body">
+                    <%= grp.privacy === 'PUBLIC' ? 'Công khai' : 'Kín' %>
+                  </span>
+                </td>
+                <td>
+                  <span class="small fw-semibold text-truncate d-inline-block" style="max-width: 180px;">
+                    <i class="fa-brands fa-facebook text-primary me-1"></i><%= acc ? acc.name : 'Tài khoản #' + grp.account_id %>
+                  </span>
+                </td>
+                <td class="text-end pe-4">
+                  <form action="/facebook/groups/delete/<%= grp.id %>" method="POST" onsubmit="return confirm('Bạn có chắc muốn xoá nhóm này?');" class="d-inline">
+                    <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill" title="Xoá">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          <% } else { %>
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                <i class="fa-solid fa-users-slash fs-1 text-secondary d-block mb-3"></i>
+                Chưa có nhóm nào. Nhấn "Quét Danh Sách Nhóm" hoặc "Thêm Nhóm Mới" để bắt đầu!
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Thêm Nhóm Mới Thủ Công -->
+<div class="modal fade" id="addGroupModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Thêm Nhóm Facebook Mới</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/facebook/groups/create" method="POST">
+        <div class="modal-body p-4">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Tài khoản sở hữu <span class="text-danger">*</span></label>
+              <select name="account_id" class="form-select" required>
+                <% accounts.forEach(acc => { %>
+                  <option value="<%= acc.id %>"><%= acc.name %> (UID: <%= acc.uid %>)</option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Tên nhóm Facebook <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" placeholder="VD: BẤT ĐỘNG SẢN BÌNH THẠNH CHÍNH CHỦ" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Facebook Group ID <span class="text-danger">*</span></label>
+              <input type="text" name="group_id" class="form-control" placeholder="VD: 1092837465012" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Quyền đăng bài</label>
+              <select name="post_permission" class="form-select">
+                <option value="auto_approve">Tự do (Auto approve)</option>
+                <option value="pending">Chờ duyệt (Pending)</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Số lượng thành viên</label>
+              <input type="number" name="member_count" class="form-control" placeholder="VD: 50000" value="50000">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Quyền riêng tư</label>
+              <select name="privacy" class="form-select">
+                <option value="PUBLIC">Công khai (Public)</option>
+                <option value="CLOSED">Nhóm kín (Closed)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-top bg-body-tertiary">
+          <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Hủy</button>
+          <button type="submit" class="btn btn-gradient-primary rounded-pill px-4 fw-bold">Lưu Nhóm</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function applyFilters() {
+    const accId = document.getElementById('accountFilter').value;
+    const perm = document.getElementById('permissionFilter').value;
+    const q = document.getElementById('groupSearchInput').value.toLowerCase().trim();
+
+    const rows = document.querySelectorAll('.group-row');
+    rows.forEach(r => {
+      const rowName = r.getAttribute('data-name') || '';
+      const rowId = r.getAttribute('data-id') || '';
+      const rowAcc = r.getAttribute('data-account');
+      const rowPerm = r.getAttribute('data-permission');
+
+      const matchAcc = (accId === 'all' || rowAcc === accId);
+      const matchPerm = (perm === 'all' || rowPerm === perm);
+      const matchSearch = (!q || rowName.includes(q) || rowId.includes(q));
+
+      if (matchAcc && matchPerm && matchSearch) {
+        r.style.display = '';
+      } else {
+        r.style.display = 'none';
+      }
+    });
+  }
+
+  async function scanCurrentAccountGroups() {
+    const accSelect = document.getElementById('accountFilter');
+    let accId = accSelect.value;
+    if (accId === 'all') {
+      const firstAcc = document.querySelector('#accountFilter option:nth-child(2)');
+      if (firstAcc) {
+        accId = firstAcc.value;
+      } else {
+        showToast('Vui lòng thêm tài khoản Facebook trước khi quét nhóm!', false);
+        return;
+      }
+    }
+
+    showToast('Đang tiến hành quét nhóm...', true);
+    try {
+      const res = await fetch('/facebook/accounts/scan-groups/' + accId, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Quét thành công ${data.count} nhóm!`, true);
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        showToast(data.message || 'Lỗi quét nhóm', false);
+      }
+    } catch (err) {
+      showToast('Lỗi kết nối máy chủ', false);
+    }
+  }
+</script>
