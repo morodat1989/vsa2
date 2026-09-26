@@ -98,13 +98,17 @@ def home(request: Request, db: Session = Depends(get_db)):
         "successfulPosts": len([l for l in all_logs if l.status == "success"])
     }
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "active_page": "dashboard",
-        "page_title": "Tổng Quan Hệ Thống BĐS",
-        "stats": stats,
-        "recentListings": all_listings[:5]
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={
+            "request": request,
+            "active_page": "dashboard",
+            "page_title": "Tổng Quan Hệ Thống BĐS",
+            "stats": stats,
+            "recentListings": all_listings[:5]
+        }
+    )
 
 # ================= HỖ TRỢ MỞ UNGOOGLED CHROMIUM KHI CHẠY LOCAL ================= #
 def open_browser():

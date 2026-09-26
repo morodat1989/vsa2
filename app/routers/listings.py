@@ -11,12 +11,16 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/")
 def list_listings(request: Request, db: Session = Depends(get_db)):
     listings = db.query(Listing).order_by(Listing.id.desc()).all()
-    return templates.TemplateResponse("listings.html", {
-        "request": request,
-        "active_page": "listings",
-        "page_title": "Kho Bất Động Sản",
-        "listings": listings
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="listings.html",
+        context={
+            "request": request,
+            "active_page": "listings",
+            "page_title": "Kho Bất Động Sản",
+            "listings": listings
+        }
+    )
 
 @router.post("/")
 def create_listing(

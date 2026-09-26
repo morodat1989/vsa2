@@ -19,12 +19,16 @@ def view_settings(request: Request, db: Session = Depends(get_db)):
     if "gemini_api_key" not in settings_dict and os.environ.get("GEMINI_API_KEY"):
         settings_dict["gemini_api_key"] = os.environ.get("GEMINI_API_KEY")
 
-    return templates.TemplateResponse("settings.html", {
-        "request": request,
-        "active_page": "settings",
-        "page_title": "Cài Đặt Hệ Thống",
-        "settings": settings_dict
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="settings.html",
+        context={
+            "request": request,
+            "active_page": "settings",
+            "page_title": "Cài Đặt Hệ Thống",
+            "settings": settings_dict
+        }
+    )
 
 @router.post("/")
 def save_settings(

@@ -14,12 +14,16 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/accounts")
 def list_accounts(request: Request, db: Session = Depends(get_db)):
     accounts = db.query(FacebookAccount).all()
-    return templates.TemplateResponse("accounts.html", {
-        "request": request,
-        "active_page": "accounts",
-        "page_title": "Quản Lý Tài Khoản FB",
-        "accounts": accounts
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="accounts.html",
+        context={
+            "request": request,
+            "active_page": "accounts",
+            "page_title": "Quản Lý Tài Khoản FB",
+            "accounts": accounts
+        }
+    )
 
 @router.post("/accounts")
 def add_account(
@@ -70,12 +74,16 @@ def delete_account(account_id: int, db: Session = Depends(get_db)):
 @router.get("/groups")
 def list_groups(request: Request, db: Session = Depends(get_db)):
     groups = db.query(FacebookGroup).all()
-    return templates.TemplateResponse("groups.html", {
-        "request": request,
-        "active_page": "groups",
-        "page_title": "Quản Lý Nhóm Facebook",
-        "groups": groups
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="groups.html",
+        context={
+            "request": request,
+            "active_page": "groups",
+            "page_title": "Quản Lý Nhóm Facebook",
+            "groups": groups
+        }
+    )
 
 @router.post("/groups")
 def add_group(
@@ -108,12 +116,16 @@ def delete_group(group_id: int, db: Session = Depends(get_db)):
 @router.get("/logs")
 def view_logs(request: Request, db: Session = Depends(get_db)):
     logs = db.query(PostLog).order_by(PostLog.id.desc()).all()
-    return templates.TemplateResponse("logs.html", {
-        "request": request,
-        "active_page": "logs",
-        "page_title": "Lịch Sử Đăng Bài",
-        "logs": logs
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="logs.html",
+        context={
+            "request": request,
+            "active_page": "logs",
+            "page_title": "Lịch Sử Đăng Bài",
+            "logs": logs
+        }
+    )
 
 # AI Writing & Posting
 @router.get("/ai-write/{listing_id}")
@@ -133,15 +145,19 @@ def ai_write(listing_id: int, request: Request, db: Session = Depends(get_db)):
     accounts = db.query(FacebookAccount).all()
     groups = db.query(FacebookGroup).all()
 
-    return templates.TemplateResponse("ai_result.html", {
-        "request": request,
-        "active_page": "listings",
-        "page_title": "AI Tạo Bài Đăng BĐS",
-        "listing": listing,
-        "ai_content": ai_content,
-        "accounts": accounts,
-        "groups": groups
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="ai_result.html",
+        context={
+            "request": request,
+            "active_page": "listings",
+            "page_title": "AI Tạo Bài Đăng BĐS",
+            "listing": listing,
+            "ai_content": ai_content,
+            "accounts": accounts,
+            "groups": groups
+        }
+    )
 
 @router.post("/publish")
 def publish_post(
