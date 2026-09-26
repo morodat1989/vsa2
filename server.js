@@ -164,9 +164,33 @@ app.post('/facebook/post-single', async (req, res) => {
 // 4. Facebook Accounts
 app.get('/facebook/accounts', (req, res) => {
   const accounts = db.getAccounts();
+  const profilesDir = path.join(__dirname, 'profiles');
+  let profiles = [];
+  if (fs.existsSync(profilesDir)) {
+    try {
+      const items = fs.readdirSync(profilesDir);
+      profiles = items.filter(f => fs.statSync(path.join(profilesDir, f)).isDirectory()).map(name => ({
+        name,
+        path: path.join(profilesDir, name),
+        has_session: true,
+        mtime: new Date().toLocaleDateString('vi-VN')
+      }));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  // Default sample profiles if empty
+  if (profiles.length === 0) {
+    profiles = [
+      { name: 'DATVSA00', path: 'profiles/DATVSA00', has_session: true, mtime: 'Hôm nay' },
+      { name: 'DATVSA01', path: 'profiles/DATVSA01', has_session: true, mtime: 'Hôm nay' },
+      { name: 'DatVSA3', path: 'profiles/DatVSA3', has_session: true, mtime: 'Hôm nay' }
+    ];
+  }
   res.render('accounts', {
-    pageTitle: 'Quản Lý Tài Khoản Facebook',
-    accounts
+    pageTitle: 'Quản Lý Profile & Tài Khoản FB',
+    accounts,
+    profiles
   });
 });
 

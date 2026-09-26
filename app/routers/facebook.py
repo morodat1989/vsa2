@@ -1,3 +1,5 @@
+import os
+import subprocess
 import datetime
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import RedirectResponse
@@ -10,20 +12,99 @@ from app.services.ai_service import generate_ai_post
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-# Accounts
+def get_existing_profiles():
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    profiles_dir = os.path.join(root_dir, "profiles")
+    os.makedirs(profiles_dir, exist_ok=True)
+    
+    profiles = []
+    if os.path.exists(profiles_dir):
+        for name in sorted(os.listdir(profiles_dir)):
+            item_path = os.path.join(profiles_dir, name)
+            if os.path.isdir(item_path):
+                has_session = any(os.path.exists(os.path.join(item_path, sub)) for sub in ["Default", "Network", "Cookies", "Preferences"])
+                try:
+                    mtime = os.path.getmtime(item_path)
+                    mtime_str = datetime.datetime.fromtimestamp(mtime).strftime("%d/%m/%Y %H:%M")
+                except Exception:
+                    mtime_str = "---"
+                profiles.append({
+                    "name": name,
+                    "path": item_path,
+                    "has_session": has_session,
+                    "mtime": mtime_str
+                })
+    return profiles
+
+# Accounts & Profiles
 @router.get("/accounts")
 def list_accounts(request: Request, db: Session = Depends(get_db)):
     accounts = db.query(FacebookAccount).all()
+    profiles = get_existing_profiles()
+    launched = request.query_params.get("launched", None)
     return templates.TemplateResponse(
         request=request,
         name="accounts.html",
         context={
             "request": request,
             "active_page": "accounts",
-            "page_title": "Quản Lý Tài Khoản FB",
-            "accounts": accounts
+            "page_title": "Quản Lý Profile & Tài Khoản FB",
+            "accounts": accounts,
+            "profiles": profiles,
+            "launched": launched
         }
     )
+
+@router.get("/profiles/launch/{profile_name}")
+def launch_profile(profile_name: str):
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    profiles_dir = os.path.join(root_dir, "profiles")
+    target_prof = os.path.join(profiles_dir, profile_name)
+    os.makedirs(target_prof, exist_ok=True)
+    
+    chrome_candidates = [
+        os.path.join(root_dir, "Ungoogled Chromium", "chrome.exe"),
+        os.path.join(root_dir, "Ungoogled Chromium", "chromium.exe")
+    ]
+    chrome_exe = None
+    for cand in chrome_candidates:
+        if os.path.exists(cand):
+            chrome_exe = cand
+            break
+    if not chrome_exe:
+        base_cr = os.path.join(root_dir, "Ungoogled Chromium")
+        if os.path.exists(base_cr):
+            for r, d, files in os.walk(base_cr):
+                if "chrome.exe" in files:
+                    chrome_exe = os.path.join(r, "chrome.exe")
+                    break
+                elif "chromium.exe" in files:
+                    chrome_exe = os.path.join(r, "chromium.exe")
+                    break
+    
+    urls = ["http://127.0.0.1:8000", "https://www.facebook.com"]
+    if chrome_exe and os.path.exists(chrome_exe):
+        try:
+            subprocess.Popen([
+                chrome_exe,
+                f"--user-data-dir={target_prof}",
+                "--no-first-run",
+                "--no-default-browser-check"
+            ] + urls)
+        except Exception as e:
+            print(f"[Lỗi mở Chromium] {e}")
+    return RedirectResponse(url=f"/facebook/accounts?launched={profile_name}", status_code=303)
+
+@router.post("/profiles/create")
+def create_profile(profile_name: str = Form(...)):
+    name = profile_name.strip()
+    if name:
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        profiles_dir = os.path.join(root_dir, "profiles")
+        target_prof = os.path.join(profiles_dir, name)
+        os.makedirs(target_prof, exist_ok=True)
+        return RedirectResponse(url=f"/facebook/profiles/launch/{name}", status_code=303)
+    return RedirectResponse(url="/facebook/accounts", status_code=303)
 
 @router.post("/accounts")
 def add_account(

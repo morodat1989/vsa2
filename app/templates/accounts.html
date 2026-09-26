@@ -1,52 +1,126 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<!-- Header -->
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
   <div>
-    <h4 class="fw-bold mb-1"><i class="fa-brands fa-facebook text-primary me-2"></i>Quản Lý Tài Khoản Facebook</h4>
-    <p class="text-muted mb-0 small">Thêm tài khoản qua Cookie / Access Token để tự động quét nhóm và đăng bài.</p>
+    <h4 class="fw-bold mb-1"><i class="fa-brands fa-chrome text-primary me-2"></i>Quản Lý Profile Ungoogled Chromium</h4>
+    <p class="text-muted mb-0 small">Tự động nhận diện các profile có sẵn trong thư mục <code>profiles/</code>. Mở trình duyệt giữ nguyên phiên đăng nhập Facebook vĩnh viễn.</p>
   </div>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAccountModal">
-    <i class="fa-solid fa-user-plus me-1"></i> Thêm Tài Khoản
-  </button>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProfileModal">
+      <i class="fa-solid fa-folder-plus me-1"></i> Tạo Profile Mới
+    </button>
+    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addAccountModal">
+      <i class="fa-solid fa-key me-1"></i> Nhập Cookie/Token
+    </button>
+  </div>
 </div>
 
-{% if success %}
-<div class="alert alert-success alert-dismissible fade show" role="alert">
-  {{ success }}
-  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+{% if launched %}
+<div class="alert alert-success alert-dismissible fade show d-flex align-items-center shadow-sm" role="alert">
+  <i class="fa-solid fa-circle-check fs-4 me-3"></i>
+  <div>
+    <strong>Đã mở Ungoogled Chromium!</strong> Profile <code>{{ launched }}</code> đang chạy với 2 tab: FB Tool và Facebook.
+  </div>
+  <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
+<!-- PHẦN 1: DANH SÁCH PROFILES CÓ SẴN (DATVSA00, DATVSA01, DatVSA3...) -->
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex justify-content-between align-items-center">
+    <div>
+      <h5 class="fw-bold mb-1"><i class="fa-solid fa-folder-open text-warning me-2"></i>Các Profile Có Sẵn Trong Thư Mục (profiles/)</h5>
+      <small class="text-muted">Mỗi profile tương ứng 1 nick Facebook riêng biệt, hoàn toàn độc lập và an toàn.</small>
+    </div>
+    <span class="badge bg-primary fs-6">{{ profiles|length }} Profile</span>
+  </div>
+  <div class="card-body p-4">
+    <div class="row g-3">
+      {% for prof in profiles %}
+      <div class="col-md-6 col-xl-4">
+        <div class="card h-100 border border-light-subtle shadow-sm rounded-3 p-3 position-relative hover-shadow transition">
+          <div class="d-flex align-items-start justify-content-between mb-3">
+            <div class="d-flex align-items-center gap-3">
+              <div class="rounded-circle p-2 bg-primary bg-opacity-10 text-primary fs-4 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                <i class="fa-solid fa-user-shield"></i>
+              </div>
+              <div>
+                <h6 class="fw-bold mb-0 text-dark">{{ prof.name }}</h6>
+                <small class="text-muted font-monospace"><i class="fa-regular fa-folder me-1"></i>profiles\{{ prof.name }}</small>
+              </div>
+            </div>
+            {% if prof.has_session %}
+            <span class="badge bg-success-subtle text-success"><i class="fa-solid fa-check me-1"></i>Đã có data</span>
+            {% else %}
+            <span class="badge bg-secondary-subtle text-secondary"><i class="fa-regular fa-circle me-1"></i>Mới tạo</span>
+            {% endif %}
+          </div>
+
+          <div class="small text-muted mb-3">
+            <div><i class="fa-regular fa-clock me-1"></i>Cập nhật: {{ prof.mtime }}</div>
+          </div>
+
+          <div class="mt-auto pt-2 border-top d-flex gap-2">
+            <a href="/facebook/profiles/launch/{{ prof.name }}" class="btn btn-sm btn-primary flex-grow-1 fw-bold">
+              <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Mở Trình Duyệt
+            </a>
+            <a href="/facebook/groups" class="btn btn-sm btn-outline-info" title="Xem danh sách nhóm">
+              <i class="fa-solid fa-users"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12 text-center py-5 text-muted">
+        <i class="fa-solid fa-folder-open fs-1 mb-3 opacity-25"></i>
+        <h5>Chưa phát hiện thư mục Profile nào trong <code>profiles/</code></h5>
+        <p class="small">Bấm <b>"Tạo Profile Mới"</b> để tạo thư mục profile đầu tiên.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- PHẦN 2: TÀI KHOẢN FACEBOOK ĐÃ LƯU TRONG DATABASE -->
 <div class="card border-0 shadow-sm rounded-4">
-  <div class="card-body p-0">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex justify-content-between align-items-center">
+    <div>
+      <h5 class="fw-bold mb-1"><i class="fa-brands fa-facebook text-primary me-2"></i>Dữ Liệu Tài Khoản FB (Cookie / Token)</h5>
+      <small class="text-muted">Danh sách tài khoản lưu trong cơ sở dữ liệu để đăng bài tự động qua API / Browser Automation</small>
+    </div>
+  </div>
+  <div class="card-body p-0 mt-3">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th class="ps-4">UID Facebook</th>
-            <th>Tên Hiển Thị</th>
+            <th class="ps-4">Tên / Gợi Nhớ</th>
+            <th>UID Facebook</th>
             <th>Trạng Thái</th>
             <th>Kiểm Tra Gần Nhất</th>
-            <th class="text-end pe-4">Hành Động</th>
+            <th class="text-end pe-4">Thao Tác</th>
           </tr>
         </thead>
         <tbody>
           {% for acc in accounts %}
           <tr>
-            <td class="ps-4 fw-bold font-monospace text-primary">{{ acc.uid }}</td>
-            <td class="fw-semibold">{{ acc.name }}</td>
+            <td class="ps-4 fw-bold">
+              <i class="fa-brands fa-facebook text-primary me-2"></i>{{ acc.name }}
+            </td>
+            <td class="font-monospace text-primary fw-semibold">{{ acc.uid }}</td>
             <td>
               {% if acc.status == "Live" or acc.status == "live" %}
               <span class="badge bg-success-subtle text-success"><i class="fa-solid fa-circle-check me-1"></i> Live</span>
               {% else %}
-              <span class="badge bg-danger-subtle text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> Die/Checkpoint</span>
+              <span class="badge bg-danger-subtle text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> Checkpoint</span>
               {% endif %}
             </td>
-            <td class="text-muted small">{{ acc.last_checked.strftime('%d/%m/%Y %H:%M') if acc.last_checked else "Chưa check" }}</td>
+            <td class="text-muted small">{{ acc.last_checked.strftime('%d/%m/%Y %H:%M') if acc.last_checked else "---" }}</td>
             <td class="text-end pe-4">
-              <a href="/facebook/accounts/check/{{ acc.id }}" class="btn btn-sm btn-outline-secondary me-1" title="Kiểm tra Live">
-                <i class="fa-solid fa-arrows-rotate"></i> Check Live
+              <a href="/facebook/accounts/check/{{ acc.id }}" class="btn btn-sm btn-outline-secondary me-1">
+                <i class="fa-solid fa-arrows-rotate"></i> Check
               </a>
               <a href="/facebook/accounts/delete/{{ acc.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bạn có chắc muốn xóa tài khoản này?')">
                 <i class="fa-solid fa-trash"></i>
@@ -55,9 +129,8 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="5" class="text-center py-5 text-muted">
-              <i class="fa-brands fa-facebook fs-1 d-block mb-3 text-secondary opacity-50"></i>
-              Chưa có tài khoản Facebook nào. Hãy bấm <b>"Thêm Tài Khoản"</b> để bắt đầu.
+            <td colspan="5" class="text-center py-4 text-muted small">
+              Chưa có tài khoản thủ công nào trong database. Bạn có thể sử dụng trực tiếp các <b>Profile Ungoogled Chromium</b> ở trên.
             </td>
           </tr>
           {% endfor %}
@@ -67,13 +140,39 @@
   </div>
 </div>
 
-<!-- Modal Thêm Tài Khoản -->
+<!-- Modal Tạo Profile Mới -->
+<div class="modal fade" id="createProfileModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content rounded-4 border-0">
+      <form action="/facebook/profiles/create" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold"><i class="fa-solid fa-folder-plus text-primary me-2"></i>Tạo Profile Chromium Mới</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Nhập tên thư mục profile mới. Hệ thống sẽ tự động tạo thư mục trong <code>profiles/</code> và mở Ungoogled Chromium để bạn đăng nhập Facebook.</p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Tên Profile:</label>
+            <input type="text" name="profile_name" class="form-control" placeholder="Ví dụ: DATVSA04 hoặc Nick_Chinh" required autofocus>
+            <small class="text-muted">Không dấu, không khoảng trắng đặc biệt.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-rocket me-1"></i> Tạo & Mở Trình Duyệt Ngay</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nhập Cookie / Token Thủ Công -->
 <div class="modal fade" id="addAccountModal" tabindex="-1">
   <div class="modal-dialog">
-    <div class="modal-content">
+    <div class="modal-content rounded-4 border-0">
       <form action="/facebook/accounts" method="POST">
         <div class="modal-header">
-          <h5 class="modal-title fw-bold">Thêm Tài Khoản Facebook Mới</h5>
+          <h5 class="modal-title fw-bold"><i class="fa-brands fa-facebook text-primary me-2"></i>Nhập Cookie / Token Thủ Công</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
@@ -88,7 +187,6 @@
           <div class="mb-3">
             <label class="form-label fw-semibold">Cookie (c_user=...; xs=...):</label>
             <textarea name="cookie" class="form-control" rows="3" placeholder="Dán cookie tài khoản Facebook tại đây..."></textarea>
-            <small class="text-muted">Dùng để quét danh sách nhóm tự động.</small>
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold">Access Token (EAA...):</label>

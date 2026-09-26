@@ -1,20 +1,66 @@
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
   <div>
-    <h4 class="fw-bold mb-1">Tài Khoản Facebook</h4>
-    <p class="text-muted small mb-0">Quản lý dàn nick Facebook đăng bài, kiểm tra tình trạng Live/Die và quét danh sách nhóm</p>
+    <h4 class="fw-bold mb-1"><i class="fa-brands fa-chrome text-primary me-2"></i>Quản Lý Profile Ungoogled Chromium</h4>
+    <p class="text-muted small mb-0">Tự động nhận diện các profile có sẵn trong thư mục <code>profiles/</code>. Giữ nguyên phiên đăng nhập Facebook vĩnh viễn.</p>
   </div>
   <div class="d-flex gap-2">
     <button class="btn btn-outline-success rounded-pill px-3 shadow-sm" onclick="checkAllAccountsLive()">
       <i class="bi bi-shield-check me-1"></i> Kiểm Tra Tất Cả Live
     </button>
     <button class="btn btn-gradient-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#addAccountModal">
-      <i class="bi bi-plus-circle me-1"></i> Thêm Tài Khoản
+      <i class="bi bi-plus-circle me-1"></i> Nhập Cookie/Token
     </button>
   </div>
 </div>
 
+<!-- SECTION: PROFILES CHROMIUM (DATVSA00, DATVSA01, DatVSA3...) -->
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex justify-content-between align-items-center">
+    <div>
+      <h5 class="fw-bold mb-1"><i class="fa-solid fa-folder-open text-warning me-2"></i>Profile Sẵn Có Trong Thư Mục (profiles/)</h5>
+      <small class="text-muted">Chọn profile để mở trình duyệt hoặc sử dụng khi khởi động bằng start.bat</small>
+    </div>
+    <span class="badge bg-primary fs-6"><%= profiles ? profiles.length : 0 %> Profile</span>
+  </div>
+  <div class="card-body p-4">
+    <div class="row g-3">
+      <% if (profiles && profiles.length > 0) { %>
+        <% profiles.forEach(prof => { %>
+          <div class="col-md-6 col-xl-4">
+            <div class="card h-100 border border-light-subtle shadow-sm rounded-3 p-3 position-relative">
+              <div class="d-flex align-items-start justify-content-between mb-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-circle p-2 bg-primary bg-opacity-10 text-primary fs-4 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                    <i class="fa-solid fa-user-shield"></i>
+                  </div>
+                  <div>
+                    <h6 class="fw-bold mb-0 text-dark"><%= prof.name %></h6>
+                    <small class="text-muted font-monospace"><i class="fa-regular fa-folder me-1"></i>profiles\<%= prof.name %></small>
+                  </div>
+                </div>
+                <span class="badge bg-success-subtle text-success"><i class="fa-solid fa-check me-1"></i>Sẵn sàng</span>
+              </div>
+              <div class="small text-muted mb-3">
+                <div><i class="fa-regular fa-clock me-1"></i>Lần mở gần nhất: <%= prof.mtime %></div>
+              </div>
+              <div class="mt-auto pt-2 border-top d-flex gap-2">
+                <a href="http://127.0.0.1:8000/facebook/profiles/launch/<%= prof.name %>" class="btn btn-sm btn-primary flex-grow-1 fw-bold">
+                  <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Mở Profile Này
+                </a>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
 <div class="card shadow-sm border-0">
-  <div class="card-body p-0">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0">
+    <h5 class="fw-bold mb-1"><i class="fa-brands fa-facebook text-primary me-2"></i>Dữ Liệu Nick Facebook Đã Lưu (Database)</h5>
+  </div>
+  <div class="card-body p-0 mt-3">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
