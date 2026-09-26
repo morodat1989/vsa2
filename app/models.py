@@ -11,6 +11,7 @@ class Listing(Base):
     location = Column(String(255), nullable=False, default="")
     description = Column(Text, nullable=True, default="")
     image_url = Column(String(500), nullable=True, default="")
+    images = Column(Text, nullable=True, default="[]") # JSON list các ảnh đã tải lên
     contact = Column(String(100), nullable=True, default="")
     status = Column(String(50), default="available")
     marketplace_status = Column(String(50), default="not_posted") # not_posted, active, in_review, expired, renewal_needed

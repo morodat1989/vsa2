@@ -62,6 +62,11 @@ init_sample_data()
 
 app = FastAPI(title="FB Tool Quản Lý BĐS & Mạng Xã Hội")
 
+# Mount Uploads directory for property photos
+uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
 # Templates
 templates = Jinja2Templates(directory="app/templates")
 

@@ -1,6 +1,128 @@
 import os
+import re
+import json
 import random
 from google import genai
+
+def parse_and_refine_listing_ai(raw_text: str) -> dict:
+    """
+    Trích xuất và chuẩn hóa bài đăng BĐS chỉ từ 1 ô dán văn bản thô (raw_text).
+    Gemini tự động nhận diện: Tiêu đề, Giá (tỷ/triệu), Diện tích (m2), Vị trí, và biên tập lại thành bài đăng chuẩn súc tích có icon + SĐT 0559 431 814.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        try:
+            from app.database import SessionLocal
+            from app.models import Setting
+            with SessionLocal() as db_session:
+                row = db_session.query(Setting).filter(Setting.key == "gemini_api_key").first()
+                if row and row.value:
+                    api_key = row.value.strip()
+                    os.environ["GEMINI_API_KEY"] = api_key
+        except Exception:
+            pass
+
+    # Regex trích xuất nhanh đề phòng lỗi mạng hoặc không có API key
+    fallback_title = "Bất động sản chính chủ"
+    lines = [l.strip() for l in raw_text.strip().split("\n") if l.strip()]
+    if lines:
+        fallback_title = lines[0].replace("🏠", "").replace("👉", "").replace("💎", "").replace("✨", "").strip()
+        if len(fallback_title) > 90:
+            fallback_title = fallback_title[:87] + "..."
+
+    # Trích xuất giá sơ bộ
+    fallback_price = 0.0
+    price_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(tỷ|ty|tr|triệu|trieu)", raw_text, re.IGNORECASE)
+    if price_match:
+        val = float(price_match.group(1).replace(",", "."))
+        unit = price_match.group(2).lower()
+        if "t" in unit and ("tr" not in unit and "tri" not in unit):
+            fallback_price = val
+        else:
+            fallback_price = round(val / 1000.0, 3)
+
+    # Trích xuất diện tích sơ bộ
+    fallback_area = 50.0
+    area_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:m2|m²|mét)", raw_text, re.IGNORECASE)
+    if area_match:
+        fallback_area = float(area_match.group(1).replace(",", "."))
+
+    fallback_location = "Hải Phòng"
+    for cand in ["Văn Cao", "Lê Hồng Phong", "Dư Hàng", "Hoàng Huy", "Cầu Rào", "Dương Kinh", "Cầu Giấy", "Hà Nội"]:
+        if cand.lower() in raw_text.lower():
+            fallback_location = cand
+            break
+
+    structured = {
+        "title": fallback_title,
+        "price": fallback_price,
+        "area": fallback_area,
+        "location": fallback_location,
+        "description": raw_text.strip(),
+        "refined_content": f"""🏠 {fallback_title.upper()}
+📍 Vị trí: {fallback_location}
+💰 Giá: {fallback_price if fallback_price else 'Thỏa thuận'}
+✨ Diện tích: {fallback_area} m²
+👉 Thông tin chi tiết:
+{raw_text.strip()}
+☎️ SĐT/Zalo: 0559 431 814"""
+    }
+
+    if not api_key:
+        return structured
+
+    prompt = f"""
+Bạn là chuyên gia thẩm định và copywriting BĐS tại Việt Nam. 
+Người dùng dán nội dung thông tin một bất động sản sau đây:
+
+\"\"\"
+{raw_text}
+\"\"\"
+
+Nhiệm vụ của bạn:
+1. Trích xuất thông tin có cấu trúc chuẩn xác:
+   - title: Tiêu đề BĐS ngắn gọn, giật tít thu hút (dưới 85 ký tự, ví dụ: "Cho thuê nguyên căn Văn Cao siêu đẹp 5PN", "Bán nhà dân xây mặt đường đôi Lê Hồng Phong").
+   - price: Giá quy đổi ra đơn vị TỶ VNĐ (số thực float). Ví dụ: 25 triệu -> 0.025, 16 triệu -> 0.016, 6.3 tỷ -> 6.3, 15.5 tỷ -> 15.5, nếu thỏa thuận/không rõ ghi 0.
+   - area: Diện tích m2 (số thực float, ví dụ 80, 49.5, 200).
+   - location: Vị trí / Địa chỉ ngắn gọn (ví dụ: "Văn Cao, Hải Phòng", "Hoàng Huy Riverside, Chi Lăng", "Lê Hồng Phong, Hải Phòng").
+   - description: Tóm tắt lại công năng & tiện ích chính (ví dụ: "5 ngủ khép kín, full đồ, ô tô đỗ cửa, bìa đỏ chính chủ").
+   - refined_content: Biên tập lại toàn bộ bài viết theo đúng phong cách môi giới THỰC CHIẾN: NGẮN GỌN, SÚC TÍCH, DÙNG ICON ĐẦU DÒNG (*, 👉, 📍, 💰, ✨, 🏠, 📕, ☎️) và BẮT BUỘC DÒNG CUỐI LÀ "☎️ SĐT/Zalo: 0559 431 814".
+
+CHỈ TRẢ VỀ DUY NHẤT 1 ĐỐI TƯỢNG JSON HỢP LỆ THEO ĐỊNH DẠNG NÀY (Không có bất kỳ chữ nào khác):
+{{
+  "title": "Tiêu đề BĐS",
+  "price": 6.3,
+  "area": 49.5,
+  "location": "Lê Hồng Phong, Hải Phòng",
+  "description": "Nhà dân xây độc lập, ô tô vào nhà, bìa đỏ chính chủ",
+  "refined_content": "Bài viết hoàn chỉnh có icon và SĐT 0559 431 814"
+}}
+"""
+    candidate_models = ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3.8-flash"]
+    for model_name in candidate_models:
+        try:
+            client = genai.Client(api_key=api_key)
+            res = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            if res and res.text:
+                txt = res.text.strip()
+                # Loại bỏ markdown code blocks nếu có
+                if txt.startswith("```"):
+                    txt = re.sub(r"^```(?:json)?", "", txt)
+                    txt = re.sub(r"```$", "", txt).strip()
+                data = json.loads(txt)
+                if isinstance(data, dict) and "title" in data:
+                    # Đảm bảo chắc chắn có đúng SĐT/Zalo
+                    if "refined_content" in data and "0559 431 814" not in data["refined_content"]:
+                        data["refined_content"] += "\n☎️ SĐT/Zalo: 0559 431 814"
+                    return data
+        except Exception:
+            continue
+
+    return structured
+
 
 def build_default_listing_content(listing_title: str, price: float, area: float, location: str, description: str) -> str:
     """

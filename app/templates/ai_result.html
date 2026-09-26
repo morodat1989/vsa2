@@ -319,14 +319,28 @@
           <div class="border rounded-4 overflow-hidden shadow-xs bg-body-tertiary">
             <div style="height: 220px; background-color: #e2e8f0; position: relative;">
               {% if listing.image_url %}
-              <img src="{{ listing.image_url }}" class="w-100 h-100 object-fit-cover" alt="{{ listing.title }}">
+              <img id="mainMpCardPreviewImg" src="{{ listing.image_url }}" class="w-100 h-100 object-fit-cover" alt="{{ listing.title }}">
               {% else %}
               <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
                 <i class="fa-solid fa-image fs-1 opacity-25"></i>
               </div>
               {% endif %}
               <span class="position-absolute top-0 start-0 m-2 badge bg-dark bg-opacity-75">Marketplace Preview</span>
+              {% if listing.photo_list and listing.photo_list|length > 1 %}
+              <span class="position-absolute bottom-0 end-0 m-2 badge bg-dark bg-opacity-75">
+                <i class="fa-solid fa-images me-1"></i>{{ listing.photo_list|length }} ảnh
+              </span>
+              {% endif %}
             </div>
+
+            {% if listing.photo_list and listing.photo_list|length > 1 %}
+            <div class="d-flex gap-1 p-2 bg-light border-bottom overflow-x-auto">
+              {% for p in listing.photo_list %}
+              <img src="{{ p }}" class="rounded-2 border object-fit-cover cursor-pointer flex-shrink-0" 
+                   style="width: 48px; height: 38px;" onclick="document.getElementById('mainMpCardPreviewImg').src = '{{ p }}'" alt="Photo">
+              {% endfor %}
+            </div>
+            {% endif %}
             
             <div class="p-3">
               <h5 class="fw-bold text-danger mb-1 font-monospace">{{ "{:,}".format(marketplace_data.price_vnd) }} ₫</h5>

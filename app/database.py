@@ -36,6 +36,8 @@ def run_migrations():
                     conn.execute(text("ALTER TABLE listings ADD COLUMN marketplace_url VARCHAR(500) DEFAULT ''"))
                 if "marketplace_posted_at" not in existing_cols:
                     conn.execute(text("ALTER TABLE listings ADD COLUMN marketplace_posted_at DATETIME"))
+                if "images" not in existing_cols:
+                    conn.execute(text("ALTER TABLE listings ADD COLUMN images TEXT DEFAULT '[]'"))
                 conn.commit()
 
             # 2. Bảng fb_accounts

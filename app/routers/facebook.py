@@ -359,6 +359,13 @@ def ai_write(listing_id: int, request: Request, regen: Optional[int] = 0, db: Se
     # Lịch sử bài đăng của riêng BĐS này
     listing_logs = db.query(PostLog).filter(PostLog.listing_id == listing.id).order_by(PostLog.id.desc()).all()
 
+    try:
+        listing.photo_list = json.loads(listing.images) if listing.images else []
+    except Exception:
+        listing.photo_list = []
+    if not listing.photo_list and listing.image_url:
+        listing.photo_list = [listing.image_url]
+
     return templates.TemplateResponse(
         request=request,
         name="ai_result.html",
