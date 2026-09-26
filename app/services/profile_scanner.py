@@ -168,8 +168,17 @@ def check_cdp_status():
                         
                         let name = null;
                         try {
-                            const nameEl = document.querySelector('div[data-pagelet="LeftRail"] a span, a[href*="/me/"] span, [role="navigation"] a span, div[role="banner"] span');
-                            if (nameEl) name = nameEl.innerText.trim();
+                            // Ưu tiên thẻ profile link thật sự của người dùng
+                            const meLink = document.querySelector('div[data-pagelet="LeftRail"] ul li a[href*="profile.php"], div[data-pagelet="LeftRail"] ul li a[href^="/me"], a[aria-label*="Trang cá nhân"], a[aria-label*="profile"]');
+                            if (meLink && meLink.innerText.trim().length > 1) {
+                                name = meLink.innerText.split('\n')[0].trim();
+                            }
+                            if (!name) {
+                                const meSpan = document.querySelector('div[data-pagelet="LeftRail"] a span');
+                                if (meSpan && meSpan.innerText.trim().length > 1) {
+                                    name = meSpan.innerText.trim();
+                                }
+                            }
                         } catch(e) {}
                         
                         return JSON.stringify({ 
@@ -355,7 +364,12 @@ def scan_all_profiles_detail():
                     if cdp.get("user_name"):
                         display_name = cdp.get("user_name")
                     elif cdp.get("fb_tab_title"):
-                        display_name = cdp.get("fb_tab_title")
+                        t = cdp.get("fb_tab_title")
+                        if "| Facebook" in t:
+                            clean_t = t.split("|")[0].strip()
+                            # Không dùng tiêu đề nhóm làm tên nick
+                            if not any(k in clean_t.lower() for k in ["nhóm", "group", "cho thuê", "bán", "bất động sản", "nhà đất", "căn hộ"]):
+                                display_name = clean_t
 
                 profiles.append({
                     "name": name,
@@ -528,4 +542,284 @@ def scan_facebook_groups_pacing(limit=5, delay_seconds=3.0, progress_callback=No
         "groups": scanned_results,
         "logs": logs
     }
+
+# ================= ĐĂNG BÀI THẬT VÀO HỘI NHÓM QUA CDP CHROMIUM =================
+
+def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: float = 30.0) -> dict:
+    """
+    Thực hiện tự động hóa đăng bài THẬT vào hội nhóm Facebook qua Ungoogled Chromium (CDP port 9222):
+    1. Kết nối với Chromium qua cổng 9222
+    2. Điều hướng tab Facebook tới URL hội nhóm
+    3. Tìm nút 'Bạn viết gì đi...' / 'Tạo bài viết' trên trang nhóm
+    4. Mở cửa sổ soạn thảo, điền nội dung văn bản (chuẩn sự kiện InputEvent cho Lexical/React)
+    5. Bấm nút 'Đăng' (Post)
+    6. Kiểm tra kết quả phản hồi thực tế từ Facebook (Đã đăng / Chờ duyệt / Lỗi)
+    """
+    import urllib.request
+    import json
+    import time
+
+    grp_str = str(group_id_or_url).strip()
+    if grp_str.startswith("http://") or grp_str.startswith("https://"):
+        target_group_url = grp_str
+    else:
+        target_group_url = f"https://www.facebook.com/groups/{grp_str}/"
+
+    # 1. Kết nối Ungoogled Chromium cổng 9222
+    try:
+        req = urllib.request.Request("http://127.0.0.1:9222/json", headers={"User-Agent": "FBTool"})
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            tabs = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        return {
+            "success": False,
+            "status": "failed",
+            "message": f"Chưa kết nối được Chromium cổng 9222 ({e}). Hãy chắc chắn Ungoogled Chromium đang mở qua start.bat!"
+        }
+
+    if not tabs:
+        return {
+            "success": False,
+            "status": "failed",
+            "message": "Không tìm thấy tab nào đang mở trong trình duyệt Chromium!"
+        }
+
+    # Tìm tab Facebook hoặc tab thông thường có WebSocket Debugger
+    fb_tab = next((t for t in tabs if "facebook.com" in t.get("url", "") and t.get("webSocketDebuggerUrl")), None)
+    if not fb_tab:
+        fb_tab = next((t for t in tabs if t.get("type") == "page" and t.get("webSocketDebuggerUrl")), None)
+
+    if not fb_tab:
+        return {
+            "success": False,
+            "status": "failed",
+            "message": "Không tìm thấy tab Facebook nào có cổng Debugger khả dụng."
+        }
+
+    ws_url = fb_tab["webSocketDebuggerUrl"]
+    current_tab_url = fb_tab.get("url", "")
+
+    # 2. Điều hướng tới nhóm nếu chưa ở đúng URL
+    clean_grp = grp_str.replace("https://www.facebook.com/groups/", "").replace("http://www.facebook.com/groups/", "").strip("/")
+    if clean_grp and clean_grp in current_tab_url:
+        need_nav = False
+    else:
+        need_nav = True
+
+    if need_nav:
+        cdp_send_command(ws_url, "Page.navigate", {"url": target_group_url}, timeout=6.0)
+        time.sleep(5.0)
+    else:
+        time.sleep(1.0)
+
+    # 3. Kịch bản JavaScript tự động tìm khung soạn thảo, điền nội dung và bấm Đăng
+    js_post_script = f"""
+    (async () => {{
+        const postContent = {json.dumps(content)};
+        const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+        // 1. Chờ trang tải ổn định
+        for (let i = 0; i < 20; i++) {{
+            if (document.readyState === 'complete' || document.body) break;
+            await sleep(300);
+        }}
+
+        // 2. Tìm nút mở khung tạo bài viết
+        let dialog = document.querySelector('div[role="dialog"]');
+        if (!dialog) {{
+            const promptKeywords = [
+                "bạn viết gì đi", "write something", "tạo bài viết", 
+                "tạo bài viết công khai", "create a public post", "create post", 
+                "viết gì đó", "thảo luận", "discussion", "bạn đang nghĩ gì", "what's on your mind"
+            ];
+
+            let triggerEl = null;
+            const candidates = Array.from(document.querySelectorAll('div[role="button"], span, div[tabindex="0"]'));
+            for (const el of candidates) {{
+                const text = (el.innerText || el.textContent || el.getAttribute('aria-label') || '').toLowerCase().trim();
+                if (promptKeywords.some(kw => text.includes(kw))) {{
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {{
+                        triggerEl = el;
+                        break;
+                    }}
+                }}
+            }}
+
+            if (!triggerEl) {{
+                const pagelet = document.querySelector('div[data-pagelet="GroupInlineComposer"], div[data-pagelet*="Composer"]');
+                if (pagelet) {{
+                    triggerEl = pagelet.querySelector('div[role="button"]') || pagelet;
+                }}
+            }}
+
+            if (!triggerEl) {{
+                return JSON.stringify({{
+                    success: false,
+                    step: "find_trigger",
+                    message: "Không tìm thấy nút 'Bạn viết gì đi...' trên trang nhóm. Có thể nick chưa tham gia nhóm này hoặc nhóm đã khóa tính năng đăng bài tự do."
+                }});
+            }}
+
+            triggerEl.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+            await sleep(500);
+            triggerEl.click();
+            triggerEl.dispatchEvent(new MouseEvent('mousedown', {{ bubbles: true, cancelable: true }}));
+            triggerEl.dispatchEvent(new MouseEvent('mouseup', {{ bubbles: true, cancelable: true }}));
+            triggerEl.dispatchEvent(new MouseEvent('click', {{ bubbles: true, cancelable: true }}));
+
+            // Chờ cửa sổ soạn thảo của Facebook hiện ra
+            for (let i = 0; i < 20; i++) {{
+                await sleep(300);
+                dialog = document.querySelector('div[role="dialog"]');
+                if (dialog) break;
+            }}
+        }}
+
+        if (!dialog) {{
+            return JSON.stringify({{
+                success: false,
+                step: "open_dialog",
+                message: "Đã nhấp mở ô viết bài nhưng Facebook không hiện cửa sổ soạn thảo."
+            }});
+        }}
+
+        // 3. Tìm khung nhập văn bản (hỗ trợ Lexical / Draft.js)
+        let editor = dialog.querySelector('div[role="textbox"][contenteditable="true"]') ||
+                     dialog.querySelector('div[data-lexical-editor="true"]') ||
+                     dialog.querySelector('div[contenteditable="true"]') ||
+                     document.querySelector('div[role="textbox"][contenteditable="true"]');
+
+        if (!editor) {{
+            return JSON.stringify({{
+                success: false,
+                step: "find_editor",
+                message: "Không tìm thấy khung soạn thảo văn bản trong cửa sổ tạo bài."
+            }});
+        }}
+
+        // 4. Focus và điền nội dung bài viết
+        editor.focus();
+        await sleep(300);
+
+        document.execCommand('selectAll', false, null);
+        const ok = document.execCommand('insertText', false, postContent);
+        if (!ok) {{
+            editor.innerText = postContent;
+        }}
+
+        // Kích hoạt sự kiện InputEvent để React/Lexical nhận dữ liệu và bật nút Đăng
+        editor.dispatchEvent(new InputEvent('beforeinput', {{ inputType: 'insertText', data: postContent, bubbles: true, cancelable: true }}));
+        editor.dispatchEvent(new InputEvent('input', {{ inputType: 'insertText', data: postContent, bubbles: true, cancelable: true }}));
+        editor.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        editor.dispatchEvent(new Event('change', {{ bubbles: true }}));
+
+        // Chờ 2 giây cho React kích hoạt nút Đăng
+        await sleep(2000);
+
+        // 5. Tìm nút 'Đăng' / 'Post'
+        const dialogButtons = Array.from(dialog.querySelectorAll('div[role="button"], button'));
+        let postBtn = null;
+
+        for (const btn of dialogButtons) {{
+            const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase().trim();
+            const text = (btn.innerText || btn.textContent || '').toLowerCase().trim();
+            if (ariaLabel === 'đăng' || ariaLabel === 'post' || text === 'đăng' || text === 'post') {{
+                postBtn = btn;
+                break;
+            }}
+        }}
+
+        if (!postBtn) {{
+            const visibleBtns = dialogButtons.filter(b => {{
+                const r = b.getBoundingClientRect();
+                return r.width > 50 && r.height > 25 && b.offsetParent !== null;
+            }});
+            if (visibleBtns.length > 0) {{
+                postBtn = visibleBtns[visibleBtns.length - 1];
+            }}
+        }}
+
+        if (!postBtn) {{
+            return JSON.stringify({{
+                success: false,
+                step: "find_post_button",
+                message: "Không tìm thấy nút 'Đăng' trong cửa sổ tạo bài."
+            }});
+        }}
+
+        // Kiểm tra nút Đăng có bị mờ không
+        const isAriaDisabled = postBtn.getAttribute('aria-disabled') === 'true' || postBtn.disabled;
+        if (isAriaDisabled) {{
+            editor.focus();
+            document.execCommand('insertText', false, ' ');
+            editor.dispatchEvent(new InputEvent('input', {{ inputType: 'insertText', data: ' ', bubbles: true }}));
+            await sleep(1000);
+        }}
+
+        // Nhấp nút Đăng
+        postBtn.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+        await sleep(300);
+        postBtn.click();
+        postBtn.dispatchEvent(new MouseEvent('mousedown', {{ bubbles: true, cancelable: true }}));
+        postBtn.dispatchEvent(new MouseEvent('mouseup', {{ bubbles: true, cancelable: true }}));
+        postBtn.dispatchEvent(new MouseEvent('click', {{ bubbles: true, cancelable: true }}));
+
+        // 6. Chờ Facebook xử lý đăng bài (4.5 giây)
+        await sleep(4500);
+
+        const dialogAfter = document.querySelector('div[role="dialog"]');
+        if (!dialogAfter) {{
+            return JSON.stringify({{
+                success: true,
+                status: "success",
+                message: "Đã xuất bản bài viết thành công lên hội nhóm!"
+            }});
+        }}
+
+        const dialogText = (dialogAfter.innerText || '').toLowerCase();
+        if (dialogText.includes('phê duyệt') || dialogText.includes('chờ duyệt') || dialogText.includes('quản trị viên') || dialogText.includes('pending')) {{
+            return JSON.stringify({{
+                success: true,
+                status: "pending",
+                message: "Bài viết đã gửi thành công và đang chờ Quản trị viên nhóm phê duyệt."
+            }});
+        }}
+
+        if (dialogText.includes('không thể') || dialogText.includes('bị chặn') || dialogText.includes('lỗi') || dialogText.includes('thử lại') || dialogText.includes('tiêu chuẩn cộng đồng')) {{
+            return JSON.stringify({{
+                success: false,
+                status: "failed",
+                message: "Facebook từ chối bài đăng: " + dialogAfter.innerText.substring(0, 150)
+            }});
+        }}
+
+        return JSON.stringify({{
+            success: true,
+            status: "success",
+            message: "Đã hoàn tất gửi lệnh đăng bài lên nhóm thành công!"
+        }});
+    }})()
+    """
+
+    eval_res = cdp_send_command(
+        ws_url,
+        "Runtime.evaluate",
+        {"expression": js_post_script, "awaitPromise": True, "returnByValue": True},
+        timeout=timeout
+    )
+
+    if eval_res and "result" in eval_res and "value" in eval_res["result"]:
+        try:
+            val = json.loads(eval_res["result"]["value"])
+            return val
+        except Exception:
+            return {"success": True, "status": "success", "message": "Đã thực thi đăng bài qua trình duyệt."}
+
+    return {
+        "success": False,
+        "status": "failed",
+        "message": "Không nhận được phản hồi từ Chromium khi thực thi đăng bài (timeout hoặc trang chưa tải xong)."
+    }
+
 

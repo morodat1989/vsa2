@@ -9,7 +9,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FacebookAccount, FacebookGroup, PostLog, Listing
 from app.services.ai_service import generate_ai_post, generate_marketplace_data, generate_spintax_variation
-from app.services.profile_scanner import scan_all_profiles_detail, set_active_profile_name, scan_facebook_groups_pacing
+from app.services.profile_scanner import (
+    scan_all_profiles_detail, 
+    set_active_profile_name, 
+    scan_facebook_groups_pacing, 
+    post_to_facebook_group_via_cdp
+)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -22,7 +27,14 @@ def sync_profiles_to_db(db: Session):
             # Đảm bảo UID luôn duy nhất tuyệt đối theo tên profile nếu không có UID số
             numeric_uid = prof.get("c_user") if (prof.get("c_user") and str(prof.get("c_user")).isdigit()) else None
             safe_uid = numeric_uid or f"profile_{prof['name']}"
-            account_name = f"{prof['user_name']} ({prof['name']})" if prof.get("user_name") else f"Profile: {prof['name']}"
+            
+            # Làm sạch tên hiển thị tài khoản, không để tiêu đề trang web / nhóm ghi đè tên người dùng
+            raw_user_name = prof.get("user_name")
+            if raw_user_name:
+                if "| Facebook" in raw_user_name or any(k in raw_user_name.lower() for k in ["cho thuê", "nhà đất", "bất động sản", "nhóm", "group", "cộng đồng"]):
+                    raw_user_name = None
+            
+            account_name = f"{raw_user_name} ({prof['name']})" if raw_user_name else f"Nick FB ({prof['name']})"
 
             # Tìm theo UID hoặc tên profile
             existing = db.query(FacebookAccount).filter(
@@ -364,6 +376,11 @@ def publish_post(
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     group = db.query(FacebookGroup).filter(FacebookGroup.group_id == group_id).first()
 
+    # Thực hiện đăng thật sự vào Facebook qua Chromium CDP cổng 9222
+    cdp_res = post_to_facebook_group_via_cdp(group_id, content)
+    st = cdp_res.get("status", "success") if cdp_res.get("success") else "failed"
+    msg = cdp_res.get("message", "Đăng bài qua phiên duyệt")
+
     # Log action
     log = PostLog(
         listing_id=listing.id if listing else None,
@@ -374,8 +391,8 @@ def publish_post(
         group_name=group.name if group else group_id,
         group_id=group_id,
         members_count=group.members_count if group else 0,
-        status="success",
-        message="Đăng thành công lên nhóm qua phiên duyệt",
+        status=st,
+        message=msg,
         post_url=f"https://facebook.com/groups/{group_id}" if group_id else "",
         created_at=datetime.datetime.utcnow()
     )
@@ -449,7 +466,23 @@ async def publish_batch(request: Request, db: Session = Depends(get_db)):
                 # Tạo nội dung chống spam với Spintax
                 final_post_text = generate_spintax_variation(base_content, idx) if use_spintax else base_content
                 
-                logs.append(f"[{idx}/{len(groups)}] Đang đăng vào nhóm: \"{grp.name}\" ({grp.members_count:,} TV)...")
+                logs.append(f"[{idx}/{len(groups)}] Đang điều khiển Chromium mở nhóm: \"{grp.name}\" (ID: {grp.group_id})...")
+                
+                # THỰC THI ĐĂNG BÀI THẬT VÀO NHÓM QUA CDP CHROMIUM
+                cdp_res = post_to_facebook_group_via_cdp(grp.group_id, final_post_text)
+                
+                if cdp_res.get("success"):
+                    status_val = cdp_res.get("status", "success")
+                    msg_val = cdp_res.get("message", "Đã xuất bản bài viết thành công lên nhóm")
+                    if status_val == "pending":
+                        logs.append(f"  🟡 {msg_val}")
+                    else:
+                        logs.append(f"  ✅ {msg_val}")
+                    posted_count += 1
+                else:
+                    status_val = "failed"
+                    msg_val = cdp_res.get("message", "Lỗi khi đăng bài")
+                    logs.append(f"  ❌ {msg_val}")
                 
                 # Ghi lịch sử đăng chi tiết
                 g_log = PostLog(
@@ -461,22 +494,21 @@ async def publish_batch(request: Request, db: Session = Depends(get_db)):
                     group_name=grp.name,
                     group_id=grp.group_id,
                     members_count=grp.members_count,
-                    status="success",
-                    message="Đã đăng thành công kèm Spintax chống spam",
+                    status=status_val,
+                    message=msg_val,
                     post_url=f"https://facebook.com/groups/{grp.group_id}",
                     created_at=datetime.datetime.utcnow()
                 )
                 db.add(g_log)
-                posted_count += 1
+                db.commit()
                 
                 # Nghỉ giữa chừng tránh checkpoint
                 if idx < len(groups):
                     logs.append(f" ⏸️ Đang tạm nghỉ {delay_seconds:.1f}s trước nhóm tiếp theo để bảo vệ nick...")
-                    # Khi chạy thực tế trên desktop sẽ nghỉ đủ delay_seconds, test nhẹ 0.5s nếu request nhanh
-                    # time.sleep(min(delay_seconds, 2.0))
+                    time.sleep(delay_seconds)
 
         db.commit()
-        logs.append(f"🎉 Hoàn tất! Đã đăng thành công {posted_count} bài viết.")
+        logs.append(f"🎉 Hoàn tất! Đã xử lý xong {len(selected_group_ids)} nhóm ({posted_count} bài thành công).")
 
         return JSONResponse({
             "success": True,
