@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1"><i class="fa-solid fa-clock-rotate-left text-warning me-2"></i>Lịch Sử & Nhật Ký Đăng Bài</h4>
+    <p class="text-muted mb-0 small">Theo dõi tiến trình đăng bài lên các hội nhóm Facebook.</p>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Thời Gian</th>
+            <th>Tài Khoản Đăng</th>
+            <th>Nhóm Đăng</th>
+            <th>BĐS</th>
+            <th>Trạng Thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td class="ps-4 text-muted small">{{ log.created_at.strftime('%d/%m/%Y %H:%M:%S') if log.created_at else '' }}</td>
+            <td class="fw-semibold">{{ log.account_name if log.account_name else 'Tài khoản' }}</td>
+            <td>{{ log.group_name if log.group_name else log.group_id }}</td>
+            <td class="text-truncate" style="max-width: 250px;">{{ log.listing_title }}</td>
+            <td>
+              {% if log.status == 'success' %}
+              <span class="badge bg-success-subtle text-success"><i class="fa-solid fa-circle-check me-1"></i> Thành công</span>
+              {% else %}
+              <span class="badge bg-danger-subtle text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> Lỗi / Kiểm duyệt</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center py-5 text-muted">
+              <i class="fa-solid fa-clock-rotate-left fs-1 d-block mb-3 opacity-25"></i>
+              Chưa có nhật ký đăng bài nào.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

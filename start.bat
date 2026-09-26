@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title KHOI DONG FB TOOL BĐS & FASTAPI SERVER
+title KHOI DONG FB TOOL BDS VA FASTAPI SERVER
 color 0A
 
 echo ========================================================

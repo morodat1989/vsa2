@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1"><i class="fa-brands fa-facebook text-primary me-2"></i>Quản Lý Tài Khoản Facebook</h4>
+    <p class="text-muted mb-0 small">Thêm tài khoản qua Cookie / Access Token để tự động quét nhóm và đăng bài.</p>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAccountModal">
+    <i class="fa-solid fa-user-plus me-1"></i> Thêm Tài Khoản
+  </button>
+</div>
+
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  {{ success }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="card border-0 shadow-sm rounded-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">UID Facebook</th>
+            <th>Tên Hiển Thị</th>
+            <th>Trạng Thái</th>
+            <th>Kiểm Tra Gần Nhất</th>
+            <th class="text-end pe-4">Hành Động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for acc in accounts %}
+          <tr>
+            <td class="ps-4 fw-bold font-monospace text-primary">{{ acc.uid }}</td>
+            <td class="fw-semibold">{{ acc.name }}</td>
+            <td>
+              {% if acc.status == "Live" or acc.status == "live" %}
+              <span class="badge bg-success-subtle text-success"><i class="fa-solid fa-circle-check me-1"></i> Live</span>
+              {% else %}
+              <span class="badge bg-danger-subtle text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> Die/Checkpoint</span>
+              {% endif %}
+            </td>
+            <td class="text-muted small">{{ acc.last_checked.strftime('%d/%m/%Y %H:%M') if acc.last_checked else "Chưa check" }}</td>
+            <td class="text-end pe-4">
+              <a href="/facebook/accounts/check/{{ acc.id }}" class="btn btn-sm btn-outline-secondary me-1" title="Kiểm tra Live">
+                <i class="fa-solid fa-arrows-rotate"></i> Check Live
+              </a>
+              <a href="/facebook/accounts/delete/{{ acc.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bạn có chắc muốn xóa tài khoản này?')">
+                <i class="fa-solid fa-trash"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center py-5 text-muted">
+              <i class="fa-brands fa-facebook fs-1 d-block mb-3 text-secondary opacity-50"></i>
+              Chưa có tài khoản Facebook nào. Hãy bấm <b>"Thêm Tài Khoản"</b> để bắt đầu.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Thêm Tài Khoản -->
+<div class="modal fade" id="addAccountModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/facebook/accounts" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Thêm Tài Khoản Facebook Mới</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Tên gợi nhớ:</label>
+            <input type="text" name="name" class="form-control" placeholder="Nick chính / Nick clone 1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">UID Facebook:</label>
+            <input type="text" name="uid" class="form-control" placeholder="Ví dụ: 1000839281928" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Cookie (c_user=...; xs=...):</label>
+            <textarea name="cookie" class="form-control" rows="3" placeholder="Dán cookie tài khoản Facebook tại đây..."></textarea>
+            <small class="text-muted">Dùng để quét danh sách nhóm tự động.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Access Token (EAA...):</label>
+            <textarea name="token" class="form-control" rows="2" placeholder="Dán access token EAAG... (nếu có)"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk me-1"></i> Lưu Tài Khoản</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

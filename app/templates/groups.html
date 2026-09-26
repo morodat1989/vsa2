@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1"><i class="fa-solid fa-users-rectangle text-info me-2"></i>Quản Lý Nhóm Facebook</h4>
+    <p class="text-muted mb-0 small">Danh sách các hội nhóm BĐS để đăng bài và tương tác.</p>
+  </div>
+  <div>
+    <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#scanGroupModal">
+      <i class="fa-solid fa-magnifying-glass me-1"></i> Quét Nhóm Tự Động
+    </button>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGroupModal">
+      <i class="fa-solid fa-plus me-1"></i> Thêm Nhóm Thủ Công
+    </button>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Tên Nhóm</th>
+            <th>ID Nhóm</th>
+            <th>Thành Viên</th>
+            <th>Quyền Riêng Tư</th>
+            <th class="text-end pe-4">Hành Động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in groups %}
+          <tr>
+            <td class="ps-4 fw-bold">
+              <a href="https://facebook.com/groups/{{ g.group_id }}" target="_blank" class="text-decoration-none text-dark">
+                {{ g.name }} <i class="fa-solid fa-arrow-up-right-from-square text-muted small ms-1"></i>
+              </a>
+            </td>
+            <td class="font-monospace text-muted">{{ g.group_id }}</td>
+            <td><span class="badge bg-secondary-subtle text-secondary">{{ g.members_count }}</span></td>
+            <td>
+              <span class="badge bg-primary-subtle text-primary">{{ g.privacy }}</span>
+            </td>
+            <td class="text-end pe-4">
+              <a href="/facebook/groups/delete/{{ g.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bạn có chắc muốn xóa nhóm này?')">
+                <i class="fa-solid fa-trash"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center py-5 text-muted">
+              <i class="fa-solid fa-users fs-1 d-block mb-3 opacity-25"></i>
+              Chưa có nhóm nào. Bấm <b>"Quét Nhóm Tự Động"</b> từ nick Facebook hoặc thêm thủ công.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Thêm Nhóm -->
+<div class="modal fade" id="addGroupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/facebook/groups" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Thêm Nhóm Facebook</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Tên Nhóm:</label>
+            <input type="text" name="name" class="form-control" placeholder="Hội Bất Động Sản Hà Nội..." required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">ID Nhóm (Group ID):</label>
+            <input type="text" name="group_id" class="form-control" placeholder="Ví dụ: 1234567890123" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Số lượng thành viên (ước tính):</label>
+            <input type="number" name="members_count" class="form-control" value="10000">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+          <button type="submit" class="btn btn-primary">Lưu Nhóm</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

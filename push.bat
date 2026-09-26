@@ -4,7 +4,7 @@ title DAY CODE LEN GITHUB - MORODAT1989/VSA2
 color 0B
 
 echo ========================================================
-echo             DONG BO & DAY CODE LEN GITHUB
+echo             DONG BO VA DAY CODE LEN GITHUB
 echo ========================================================
 echo.
 

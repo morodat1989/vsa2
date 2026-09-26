@@ -37,6 +37,11 @@ app.use((req, res, next) => {
 
 // ================= ROUTES ================= //
 
+// Aliases
+app.get('/accounts', (req, res) => res.redirect('/facebook/accounts'));
+app.get('/groups', (req, res) => res.redirect('/facebook/groups'));
+app.get('/logs', (req, res) => res.redirect('/facebook/logs'));
+
 // 1. Dashboard
 app.get('/', (req, res) => {
   const listings = db.getListings();
