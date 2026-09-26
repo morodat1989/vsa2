@@ -847,23 +847,40 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
 
     time.sleep(0.5)
 
-    # 4. BƯỚC 2: Định vị khung nhập văn bản (placeholder "Tạo bài viết công khai...") và lấy tọa độ
-    js_locate_editor = """
+    # 4. BƯỚC 2: Định vị khung nhập văn bản và chèn nội dung trực tiếp
+    js_locate_and_fill = """
     (async () => {
-        const allDialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
-        const dialog = allDialogs[allDialogs.length - 1] || document.body;
+        const postContent = %%POST_CONTENT%%;
+
+        const getComposerDialog = () => {
+            const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+            const visible = dialogs.filter(d => {
+                const r = d.getBoundingClientRect();
+                return r.width > 260 && r.height > 180 && window.getComputedStyle(d).visibility !== 'hidden';
+            });
+            for (const d of visible) {
+                if (d.querySelector('[role="textbox"], [contenteditable="true"], [data-lexical-editor="true"]')) {
+                    return d;
+                }
+                const t = (d.innerText || '').toLowerCase();
+                if (t.includes('tạo bài viết') || t.includes('create post') || t.includes('bạn viết gì đi')) {
+                    return d;
+                }
+            }
+            return visible[visible.length - 1] || dialogs[dialogs.length - 1] || document.body;
+        };
+
+        const dialog = getComposerDialog();
 
         const editorSelectors = [
             'div[role="textbox"][contenteditable="true"]',
             'div[role="textbox"][contenteditable]',
-            'div[role="textbox"]',
-            '[role="textbox"]',
             'div[data-lexical-editor="true"]',
             'div[data-lexical-editor]',
             'div[contenteditable="true"]',
             'div[contenteditable]',
+            '[role="textbox"]',
             '[contenteditable="true"]',
-            '[contenteditable]',
             'div[aria-label*="Tạo bài viết công khai"]',
             'div[aria-label*="Tạo bài viết"]',
             'div[aria-label*="Create a public post"]',
@@ -895,18 +912,32 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
             return JSON.stringify({ success: false, message: "Không tìm thấy khung nhập văn bản trong cửa sổ tạo bài." });
         }
 
-        // Lấy tọa độ tâm của khung nhập văn bản
+        // Cuộn và focus vào editor
         editor.scrollIntoView({ behavior: 'instant', block: 'center' });
+        editor.focus();
+
+        // Chèn văn bản trực tiếp
+        try {
+            document.execCommand('selectAll', false, null);
+            document.execCommand('insertText', false, postContent);
+        } catch (e) {}
+
+        const evt1 = new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: postContent });
+        editor.dispatchEvent(evt1);
+        const evt2 = new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: postContent });
+        editor.dispatchEvent(evt2);
+
+        // Lấy tọa độ tâm của khung nhập văn bản
         const rect = editor.getBoundingClientRect();
         return JSON.stringify({
             success: true,
-            x: Math.round(rect.left + rect.width / 2),
-            y: Math.round(rect.top + rect.height / 2)
+            x: Math.round(rect.left + Math.min(rect.width / 2, 60)),
+            y: Math.round(rect.top + Math.min(rect.height / 2, 30))
         });
     })()
-    """
+    """.replace("%%POST_CONTENT%%", json.dumps(content))
 
-    res_loc = cdp_send_command(ws_url, "Runtime.evaluate", {"expression": js_locate_editor, "awaitPromise": True, "returnByValue": True}, timeout=10.0)
+    res_loc = cdp_send_command(ws_url, "Runtime.evaluate", {"expression": js_locate_and_fill, "awaitPromise": True, "returnByValue": True}, timeout=10.0)
     editor_x = None
     editor_y = None
     if res_loc and "result" in res_loc and "value" in res_loc["result"]:
@@ -923,46 +954,82 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
         cdp_send_command(ws_url, "Input.dispatchMouseEvent", {"type": "mousePressed", "x": int(editor_x), "y": int(editor_y), "button": "left", "clickCount": 1}, timeout=2.0)
         time.sleep(0.05)
         cdp_send_command(ws_url, "Input.dispatchMouseEvent", {"type": "mouseReleased", "x": int(editor_x), "y": int(editor_y), "button": "left", "clickCount": 1}, timeout=2.0)
-        time.sleep(0.3)
+        time.sleep(0.2)
 
     # 5. BƯỚC 3: Điền nội dung bài viết qua native CDP Input.insertText (100% chuẩn người dùng gõ thật)
     cdp_send_command(ws_url, "Input.insertText", {"text": content}, timeout=5.0)
     time.sleep(0.8)
 
-    # 6. BƯỚC 4: Tìm và nhấp nút 'Đăng' (Post)
+    # 6. BƯỚC 4: Tìm và nhấp nút 'Đăng' hoặc 'Tiếp' (hỗ trợ cả quy trình 1 bước và 2 bước)
     js_click_post = """
     (async () => {
         const sleep = (ms) => new Promise(res => setTimeout(res, ms));
-        const allDialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
-        const dialog = allDialogs[allDialogs.length - 1] || document.body;
 
-        const allCandidates = Array.from(dialog.querySelectorAll('*'));
+        const getComposerDialog = () => {
+            const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+            const visible = dialogs.filter(d => {
+                const r = d.getBoundingClientRect();
+                return r.width > 260 && r.height > 180 && window.getComputedStyle(d).visibility !== 'hidden';
+            });
+            for (const d of visible) {
+                if (d.querySelector('[role="textbox"], [contenteditable="true"], [data-lexical-editor="true"]')) {
+                    return d;
+                }
+                const t = (d.innerText || '').toLowerCase();
+                if (t.includes('tạo bài viết') || t.includes('create post') || t.includes('bạn viết gì đi')) {
+                    return d;
+                }
+            }
+            return visible[visible.length - 1] || dialogs[dialogs.length - 1] || document.body;
+        };
+
+        const dialog = getComposerDialog();
+
+        // Danh sách từ khóa xuất bản bài viết
+        const primaryWords = ['đăng', 'tiếp', 'post', 'next', 'tiếp tục', 'chia sẻ', 'share', 'publish', 'xong'];
+        const isAvoidWord = (txt) => {
+            const t = (txt || '').toLowerCase();
+            return t.includes('ẩn danh') || t.includes('đóng') || t.includes('close') || t.includes('ảnh') || t.includes('photo') || t.includes('video') || t.includes('cảm xúc') || t.includes('feeling') || t.includes('gắn thẻ') || t.includes('tag');
+        };
+
         let postBtn = null;
 
-        // Ưu tiên 1: Phần tử mang chữ "Đăng" hoặc "Post" với kích thước nút (width > 60, height > 20)
-        for (const el of allCandidates) {
-            const txt = (el.innerText || el.textContent || '').trim();
-            const al = (el.getAttribute('aria-label') || '').trim();
-            if (txt === 'Đăng' || txt === 'Post' || al === 'Đăng' || al === 'Post') {
-                const btn = el.closest('[role="button"]') || el.closest('button') || el;
-                const r = btn.getBoundingClientRect();
-                if (r.width > 60 && r.height > 20) {
+        // CHIẾN LƯỢC 1: Quét tất cả các phần tử có role="button" hoặc <button> trong dialog
+        const allButtons = Array.from(dialog.querySelectorAll('[role="button"], button'));
+
+        // 1a: Khớp chính xác aria-label
+        for (const btn of allButtons) {
+            const al = (btn.getAttribute('aria-label') || '').toLowerCase().trim();
+            if (isAvoidWord(al)) continue;
+            if (primaryWords.includes(al) || al === 'đăng bài' || al === 'đăng bài viết' || al === 'create post') {
+                postBtn = btn;
+                break;
+            }
+        }
+
+        // 1b: Khớp chính xác innerText / textContent của nút
+        if (!postBtn) {
+            for (const btn of allButtons) {
+                const txt = (btn.innerText || btn.textContent || '').toLowerCase().trim();
+                if (isAvoidWord(txt)) continue;
+                if (primaryWords.includes(txt)) {
                     postBtn = btn;
                     break;
                 }
             }
         }
 
-        // Ưu tiên 2: Phần tử chứa chữ "Đăng" ở 35% phía dưới của dialog
+        // CHIẾN LƯỢC 2: Quét mọi phần tử con trong dialog có text chính xác là 'Đăng' hoặc 'Tiếp' hoặc 'Post'
         if (!postBtn) {
-            const dRect = dialog.getBoundingClientRect();
-            for (const el of allCandidates) {
-                const txt = (el.innerText || el.textContent || '').trim();
-                const al = (el.getAttribute('aria-label') || '').trim();
-                if (txt.includes('Đăng') || al.includes('Đăng') || txt.includes('Post')) {
+            const allEls = Array.from(dialog.querySelectorAll('*'));
+            for (const el of allEls) {
+                const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                const al = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+                if (isAvoidWord(txt) || isAvoidWord(al)) continue;
+                if (primaryWords.includes(txt) || primaryWords.includes(al)) {
                     const btn = el.closest('[role="button"]') || el.closest('button') || el;
-                    const r = btn.getBoundingClientRect();
-                    if (r.top > dRect.top + dRect.height * 0.55 && r.width > 80 && r.height > 20) {
+                    const bTxt = (btn.innerText || btn.textContent || '').toLowerCase();
+                    if (!isAvoidWord(bTxt)) {
                         postBtn = btn;
                         break;
                     }
@@ -970,37 +1037,113 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
             }
         }
 
-        // Ưu tiên 3: Nút rộng nhất ở đáy hộp thoại (nút Đăng lớn toàn chiều ngang)
+        // CHIẾN LƯỢC 3: Quét theo vị trí đáy dialog (nút màu xanh toàn chiều ngang ở footer)
         if (!postBtn) {
             const dRect = dialog.getBoundingClientRect();
-            const bottomBtns = Array.from(dialog.querySelectorAll('[role="button"], button, div[tabindex]')).filter(b => {
+            const bottomCandidates = allButtons.filter(b => {
                 const r = b.getBoundingClientRect();
-                return r.top > dRect.top + dRect.height * 0.6 && r.width > 120 && r.height > 25;
+                const txt = (b.innerText || b.textContent || b.getAttribute('aria-label') || '').toLowerCase();
+                if (isAvoidWord(txt)) return false;
+                // Nằm ở nửa dưới của dialog (từ 45% trở xuống)
+                return r.top > dRect.top + dRect.height * 0.45 && r.width > 50 && r.height > 20;
             });
-            if (bottomBtns.length > 0) {
-                bottomBtns.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width);
-                postBtn = bottomBtns[0];
+
+            if (bottomCandidates.length > 0) {
+                // Ưu tiên nút có chứa từ khóa
+                for (const b of bottomCandidates) {
+                    const bTxt = (b.innerText || b.textContent || b.getAttribute('aria-label') || '').toLowerCase();
+                    if (primaryWords.some(w => bTxt.includes(w))) {
+                        postBtn = b;
+                        break;
+                    }
+                }
+                // Nếu vẫn chưa xác định, chọn nút rộng nhất ở đáy
+                if (!postBtn) {
+                    bottomCandidates.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width);
+                    postBtn = bottomCandidates[0];
+                }
+            }
+        }
+
+        // CHIẾN LƯỢC 4 (DỰ PHÒNG TOÀN TRANG): Quét trên toàn document nếu dialog bị phân tách
+        if (!postBtn) {
+            const docButtons = Array.from(document.querySelectorAll('[role="button"], button'));
+            for (const btn of docButtons) {
+                const al = (btn.getAttribute('aria-label') || '').toLowerCase().trim();
+                const txt = (btn.innerText || btn.textContent || '').toLowerCase().trim();
+                if (isAvoidWord(al) || isAvoidWord(txt)) continue;
+                if (primaryWords.includes(al) || primaryWords.includes(txt)) {
+                    const r = btn.getBoundingClientRect();
+                    if (r.width > 50 && r.height > 20 && r.top > 100) {
+                        postBtn = btn;
+                        break;
+                    }
+                }
             }
         }
 
         if (!postBtn) {
-            return JSON.stringify({ success: false, message: "Không tìm thấy nút 'Đăng' trong cửa sổ tạo bài." });
+            return JSON.stringify({
+                success: false,
+                message: "Không tìm thấy nút 'Đăng' hoặc 'Tiếp' trong cửa sổ tạo bài."
+            });
         }
+
+        // Đảm bảo nút không bị chặn click nếu aria-disabled
+        if (postBtn.getAttribute('aria-disabled') === 'true') {
+            postBtn.removeAttribute('aria-disabled');
+            postBtn.setAttribute('tabindex', '0');
+        }
+
+        postBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
+        await sleep(150);
 
         const bRect = postBtn.getBoundingClientRect();
         const bx = Math.round(bRect.left + bRect.width / 2);
         const by = Math.round(bRect.top + bRect.height / 2);
+        const btnLabel = (postBtn.innerText || postBtn.textContent || postBtn.getAttribute('aria-label') || '').trim();
 
-        // Kích hoạt click qua JavaScript
-        postBtn.scrollIntoView({ behavior: 'instant', block: 'center' });
-        postBtn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
-        postBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-        postBtn.focus();
-        postBtn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
-        postBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-        postBtn.click();
+        // Kích hoạt chuỗi sự kiện click chuẩn trình duyệt
+        const triggerClick = (el) => {
+            el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+            el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+            el.focus();
+            el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+            el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+            el.click();
+        };
 
-        return JSON.stringify({ success: true, x: bx, y: by });
+        triggerClick(postBtn);
+
+        // NẾU LÀ NÚT "TIẾP" (Next): Chờ xem có mở bước 2 với nút "Đăng" (Post) không
+        const lowerLabel = btnLabel.toLowerCase();
+        if (lowerLabel.includes('tiếp') || lowerLabel.includes('next')) {
+            await sleep(1200);
+            const step2Dialog = getComposerDialog();
+            const step2Buttons = Array.from(step2Dialog.querySelectorAll('[role="button"], button'));
+            for (const b of step2Buttons) {
+                const bAl = (b.getAttribute('aria-label') || '').toLowerCase().trim();
+                const bTxt = (b.innerText || b.textContent || '').toLowerCase().trim();
+                if (isAvoidWord(bAl) || isAvoidWord(bTxt)) continue;
+                if (bAl === 'đăng' || bTxt === 'đăng' || bAl === 'post' || bTxt === 'post' || bAl.includes('đăng bài')) {
+                    triggerClick(b);
+                    const r2 = b.getBoundingClientRect();
+                    return JSON.stringify({
+                        success: true,
+                        label: 'Đăng (bước 2)',
+                        x: Math.round(r2.left + r2.width / 2),
+                        y: Math.round(r2.top + r2.height / 2)
+                    });
+                }
+            }
+        }
+
+        return JSON.stringify({
+            success: true,
+            label: btnLabel,
+            x: bx,
+            y: by
+        });
     })()
     """
 
