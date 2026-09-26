@@ -15,6 +15,30 @@ def get_profiles_dir():
     os.makedirs(profiles_dir, exist_ok=True)
     return profiles_dir
 
+def get_active_profile_name():
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    act_file = os.path.join(root_dir, "logs", "active_profile.txt")
+    if os.path.exists(act_file):
+        try:
+            with open(act_file, "r", encoding="utf-8") as f:
+                name = f.read().strip()
+                if name:
+                    return name
+        except Exception:
+            pass
+    return None
+
+def set_active_profile_name(name):
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logs_dir = os.path.join(root_dir, "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    act_file = os.path.join(logs_dir, "active_profile.txt")
+    try:
+        with open(act_file, "w", encoding="utf-8") as f:
+            f.write(name.strip())
+    except Exception:
+        pass
+
 def cdp_send_command(ws_url, method, params=None, timeout=2.0):
     """Gửi lệnh tới Chrome DevTools Protocol qua WebSocket thuần không cần thư viện ngoài"""
     try:
@@ -93,7 +117,7 @@ def cdp_send_command(ws_url, method, params=None, timeout=2.0):
                         return res_json.get("result")
         s.close()
     except Exception as e:
-        print(f"[CDP WS Info] {e}")
+        pass
     return None
 
 def check_cdp_status():
@@ -122,7 +146,6 @@ def check_cdp_status():
                         "is_logged_in": False
                     }
 
-                # Đã tìm thấy tab Facebook
                 tab_title = fb_tab.get("title", "")
                 tab_url = fb_tab.get("url", "")
                 ws_url = fb_tab.get("webSocketDebuggerUrl")
@@ -130,11 +153,15 @@ def check_cdp_status():
                 user_name = None
                 c_user = None
                 is_logged_in = False
+                is_login_form = False
 
                 # 1. Truy vấn sâu vào DOM và Cookie qua WebSocket CDP
                 if ws_url:
                     js_code = """
                     (() => {
+                        const isLoginForm = Boolean(
+                            document.querySelector('input[name="email"], input#email, input[name="pass"], button[name="login"], form[action*="login"]')
+                        );
                         let uid = null;
                         const m = document.cookie.match(/c_user=(\\d+)/);
                         if (m) uid = m[1];
@@ -145,7 +172,11 @@ def check_cdp_status():
                             if (nameEl) name = nameEl.innerText.trim();
                         } catch(e) {}
                         
-                        return JSON.stringify({ uid: uid, name: name });
+                        return JSON.stringify({ 
+                            uid: uid, 
+                            name: name,
+                            is_login_form: isLoginForm 
+                        });
                     })()
                     """
                     eval_res = cdp_send_command(ws_url, "Runtime.evaluate", {"expression": js_code, "returnByValue": True})
@@ -154,15 +185,17 @@ def check_cdp_status():
                             val = json.loads(eval_res["result"]["value"])
                             c_user = val.get("uid")
                             user_name = val.get("name")
+                            is_login_form = val.get("is_login_form", False)
                         except Exception:
                             pass
 
-                # 2. Nhận diện dựa trên tiêu đề và URL nếu không lấy được qua script
-                not_logged_titles = ["facebook – đăng nhập", "facebook - log in", "đăng nhập facebook", "log in to facebook"]
-                if not any(nl in tab_title.lower() for nl in not_logged_titles):
+                # 2. Xác định trạng thái đăng nhập chuẩn xác
+                not_logged_phrases = ["đăng nhập", "log in", "login", "explore the things you love"]
+                if is_login_form or any(p in tab_title.lower() for p in not_logged_phrases):
+                    is_logged_in = False
+                elif c_user and str(c_user).isdigit():
                     is_logged_in = True
-
-                if c_user:
+                elif user_name:
                     is_logged_in = True
 
                 return {
@@ -204,7 +237,6 @@ def inspect_profile_cookies(profile_path):
             cookie_file = c
             break
 
-    # Kiểm tra thêm trong các thư mục con nếu không ở vị trí chuẩn
     if not cookie_file:
         for root, dirs, files in os.walk(profile_path):
             if "Cookies" in files:
@@ -228,17 +260,17 @@ def inspect_profile_cookies(profile_path):
     has_fb = False
 
     try:
-        # Sao chép cả file Cookies và các file WAL nếu có
         shutil.copy2(cookie_file, temp_copy)
         for ext in ["-wal", "-shm"]:
             wal_src = cookie_file + ext
             if os.path.exists(wal_src):
-                shutil.copy2(wal_src, temp_copy + ext)
+                try:
+                    shutil.copy2(wal_src, temp_copy + ext)
+                except Exception:
+                    pass
 
         conn = sqlite3.connect(temp_copy)
         cursor = conn.cursor()
-        
-        # 1. Tìm bản ghi có tên c_user hoặc xs trên domain facebook.com
         cursor.execute("""
             SELECT name, value 
             FROM cookies 
@@ -248,20 +280,22 @@ def inspect_profile_cookies(profile_path):
         for name, value in rows:
             if name == "c_user":
                 has_fb = True
-                if value and value.strip():
+                if value and value.strip() and value.strip().isdigit():
                     c_user_val = value.strip()
             elif name == "xs":
                 has_fb = True
 
-        # 2. Nếu value rỗng (do mã hóa DPAPI), kiểm tra xem c_user có tồn tại không
-        if not c_user_val and has_fb:
-            cursor.execute("SELECT name FROM cookies WHERE host_key LIKE '%facebook.com%' AND name = 'c_user'")
-            if cursor.fetchone():
-                c_user_val = "Đã đăng nhập"
-
         conn.close()
+    except (PermissionError, OSError):
+        # File đang bị Chromium khóa (đang chạy), an toàn bỏ qua vì CDP sẽ đọc từ memory
+        return {
+            "has_cookie_db": True,
+            "has_fb_login": False,
+            "c_user": None,
+            "status": "Đang mở bởi Chromium"
+        }
     except Exception as e:
-        print(f"[Cookie Read Info] {profile_path}: {e}")
+        pass
     finally:
         if os.path.exists(temp_copy):
             try:
@@ -273,18 +307,11 @@ def inspect_profile_cookies(profile_path):
             except Exception:
                 pass
 
-    if c_user_val and c_user_val != "Đã đăng nhập":
+    if c_user_val:
         return {
             "has_cookie_db": True,
             "has_fb_login": True,
             "c_user": c_user_val,
-            "status": "Live"
-        }
-    elif has_fb:
-        return {
-            "has_cookie_db": True,
-            "has_fb_login": True,
-            "c_user": "Đã đăng nhập",
             "status": "Live"
         }
     else:
@@ -300,8 +327,8 @@ def scan_all_profiles_detail():
     profiles_dir = get_profiles_dir()
     profiles = []
     
-    # 1. Lấy trạng thái thời gian thực từ Chromium đang chạy (cổng 9222)
     cdp = check_cdp_status()
+    active_profile = get_active_profile_name()
 
     if os.path.exists(profiles_dir):
         for name in sorted(os.listdir(profiles_dir)):
@@ -318,16 +345,13 @@ def scan_all_profiles_detail():
                 c_user = cookie_info["c_user"]
                 display_name = None
 
-                # Nếu Chromium đang chạy và có tab Facebook đăng nhập
-                # Profile đang mở (ví dụ DATVSA00) sẽ được gán trạng thái LIVE trực tiếp
-                if cdp.get("running") and cdp.get("fb_tab_open") and cdp.get("is_logged_in"):
-                    # Kiểm tra xem profile này có phải là profile gần nhất hay không
+                # Chỉ áp dụng trạng thái live từ Chromium cho profile đang được mở (active)
+                is_current_active = (active_profile == name) or (active_profile is None and len(os.listdir(profiles_dir)) == 1)
+
+                if is_current_active and cdp.get("running") and cdp.get("fb_tab_open") and cdp.get("is_logged_in"):
                     is_live = True
                     if cdp.get("c_user"):
                         c_user = cdp.get("c_user")
-                    elif not c_user or c_user == "Đã đăng nhập":
-                        c_user = "Live Session"
-                    
                     if cdp.get("user_name"):
                         display_name = cdp.get("user_name")
                     elif cdp.get("fb_tab_title"):
@@ -347,5 +371,6 @@ def scan_all_profiles_detail():
     return {
         "profiles": profiles,
         "cdp": cdp,
+        "active_profile": active_profile,
         "live_count": len([p for p in profiles if p["has_fb_login"]])
     }

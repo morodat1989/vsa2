@@ -8,38 +8,44 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FacebookAccount, FacebookGroup, PostLog, Listing
 from app.services.ai_service import generate_ai_post
-from app.services.profile_scanner import scan_all_profiles_detail
+from app.services.profile_scanner import scan_all_profiles_detail, set_active_profile_name
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 def sync_profiles_to_db(db: Session):
-    """Đồng bộ tự động các Profile Chromium vào bảng FacebookAccount"""
+    """Đồng bộ tự động các Profile Chromium vào bảng FacebookAccount an toàn, không trùng UID"""
     scan_result = scan_all_profiles_detail()
-    for prof in scan_result["profiles"]:
-        uid_val = prof["c_user"] if prof["c_user"] and prof["c_user"] != "Live Session" else f"fb_{prof['name']}"
-        account_name = f"{prof['user_name']} ({prof['name']})" if prof.get("user_name") else f"Profile: {prof['name']}"
+    try:
+        for prof in scan_result["profiles"]:
+            # Đảm bảo UID luôn duy nhất tuyệt đối theo tên profile nếu không có UID số
+            numeric_uid = prof.get("c_user") if (prof.get("c_user") and str(prof.get("c_user")).isdigit()) else None
+            safe_uid = numeric_uid or f"profile_{prof['name']}"
+            account_name = f"{prof['user_name']} ({prof['name']})" if prof.get("user_name") else f"Profile: {prof['name']}"
 
-        existing = db.query(FacebookAccount).filter(
-            (FacebookAccount.name.like(f"%{prof['name']}%")) | (FacebookAccount.uid == uid_val)
-        ).first()
+            # Tìm theo UID hoặc tên profile
+            existing = db.query(FacebookAccount).filter(
+                (FacebookAccount.uid == safe_uid) | (FacebookAccount.name == account_name) | (FacebookAccount.name == f"Profile: {prof['name']}")
+            ).first()
 
-        status_str = "Live" if prof["has_fb_login"] else "Chưa đăng nhập FB"
-        if existing:
-            existing.status = status_str
-            existing.name = account_name
-            if prof["c_user"]:
-                existing.uid = prof["c_user"]
-            existing.last_checked = datetime.datetime.utcnow()
-        else:
-            new_acc = FacebookAccount(
-                name=account_name,
-                uid=uid_val,
-                status=status_str,
-                last_checked=datetime.datetime.utcnow()
-            )
-            db.add(new_acc)
-    db.commit()
+            status_str = "Live" if prof["has_fb_login"] else "Chưa đăng nhập FB"
+            if existing:
+                existing.status = status_str
+                existing.name = account_name
+                existing.uid = safe_uid
+                existing.last_checked = datetime.datetime.utcnow()
+            else:
+                new_acc = FacebookAccount(
+                    name=account_name,
+                    uid=safe_uid,
+                    status=status_str,
+                    last_checked=datetime.datetime.utcnow()
+                )
+                db.add(new_acc)
+        db.commit()
+    except Exception as e:
+        print(f"[DB Sync Safe Rollback] {e}")
+        db.rollback()
     return scan_result
 
 # Accounts & Profiles
@@ -77,8 +83,10 @@ def launch_profile(profile_name: str):
     profiles_dir = os.path.join(root_dir, "profiles")
     target_prof = os.path.join(profiles_dir, profile_name)
     os.makedirs(target_prof, exist_ok=True)
+    set_active_profile_name(profile_name)
     
     chrome_candidates = [
+        os.path.join(root_dir, "Ungoogled Chromium", "app", "chrome.exe"),
         os.path.join(root_dir, "Ungoogled Chromium", "chrome.exe"),
         os.path.join(root_dir, "Ungoogled Chromium", "chromium.exe")
     ]
@@ -120,6 +128,7 @@ def create_profile(profile_name: str = Form(...)):
         profiles_dir = os.path.join(root_dir, "profiles")
         target_prof = os.path.join(profiles_dir, name)
         os.makedirs(target_prof, exist_ok=True)
+        set_active_profile_name(name)
         return RedirectResponse(url=f"/facebook/profiles/launch/{name}", status_code=303)
     return RedirectResponse(url="/facebook/accounts", status_code=303)
 

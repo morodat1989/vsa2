@@ -141,6 +141,7 @@ if "!SELECTED_PROFILE!"=="NONE" (
     echo [OK] Profile duoc chon: "!SELECTED_PROFILE!"
     echo      Duong dan: "%PROFILES_DIR%\!SELECTED_PROFILE!"
     echo [PROFILE SELECTED] !SELECTED_PROFILE! >> "%DEBUG_LOG%"
+    echo !SELECTED_PROFILE! > "%LOGS_DIR%\active_profile.txt"
 )
 
 :: 4. Tao launcher uvicorn rieng biet
