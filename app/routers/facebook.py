@@ -8,52 +8,65 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FacebookAccount, FacebookGroup, PostLog, Listing
 from app.services.ai_service import generate_ai_post
+from app.services.profile_scanner import scan_all_profiles_detail
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-def get_existing_profiles():
-    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    profiles_dir = os.path.join(root_dir, "profiles")
-    os.makedirs(profiles_dir, exist_ok=True)
-    
-    profiles = []
-    if os.path.exists(profiles_dir):
-        for name in sorted(os.listdir(profiles_dir)):
-            item_path = os.path.join(profiles_dir, name)
-            if os.path.isdir(item_path):
-                has_session = any(os.path.exists(os.path.join(item_path, sub)) for sub in ["Default", "Network", "Cookies", "Preferences"])
-                try:
-                    mtime = os.path.getmtime(item_path)
-                    mtime_str = datetime.datetime.fromtimestamp(mtime).strftime("%d/%m/%Y %H:%M")
-                except Exception:
-                    mtime_str = "---"
-                profiles.append({
-                    "name": name,
-                    "path": item_path,
-                    "has_session": has_session,
-                    "mtime": mtime_str
-                })
-    return profiles
+def sync_profiles_to_db(db: Session):
+    """Đồng bộ tự động các Profile Chromium vào bảng FacebookAccount"""
+    scan_result = scan_all_profiles_detail()
+    for prof in scan_result["profiles"]:
+        uid_val = prof["c_user"] or f"profile_{prof['name']}"
+        existing = db.query(FacebookAccount).filter(
+            (FacebookAccount.name == prof["name"]) | (FacebookAccount.uid == uid_val)
+        ).first()
+
+        status_str = "Live" if prof["has_fb_login"] else "Chưa đăng nhập FB"
+        if existing:
+            existing.status = status_str
+            if prof["c_user"]:
+                existing.uid = prof["c_user"]
+            existing.last_checked = datetime.datetime.utcnow()
+        else:
+            new_acc = FacebookAccount(
+                name=f"Profile: {prof['name']}",
+                uid=uid_val,
+                status=status_str,
+                last_checked=datetime.datetime.utcnow()
+            )
+            db.add(new_acc)
+    db.commit()
+    return scan_result
 
 # Accounts & Profiles
 @router.get("/accounts")
 def list_accounts(request: Request, db: Session = Depends(get_db)):
+    scan_result = sync_profiles_to_db(db)
     accounts = db.query(FacebookAccount).all()
-    profiles = get_existing_profiles()
     launched = request.query_params.get("launched", None)
+    synced = request.query_params.get("synced", None)
+
     return templates.TemplateResponse(
         request=request,
         name="accounts.html",
         context={
             "request": request,
             "active_page": "accounts",
-            "page_title": "Quản Lý Profile & Tài Khoản FB",
+            "page_title": "Quản Lý Profile & Kết Nối Facebook",
             "accounts": accounts,
-            "profiles": profiles,
-            "launched": launched
+            "profiles": scan_result["profiles"],
+            "cdp": scan_result["cdp"],
+            "live_count": scan_result["live_count"],
+            "launched": launched,
+            "synced": synced
         }
     )
+
+@router.get("/sync-profiles")
+def manual_sync_profiles(db: Session = Depends(get_db)):
+    sync_profiles_to_db(db)
+    return RedirectResponse(url="/facebook/accounts?synced=1", status_code=303)
 
 @router.get("/profiles/launch/{profile_name}")
 def launch_profile(profile_name: str):
@@ -88,6 +101,7 @@ def launch_profile(profile_name: str):
             subprocess.Popen([
                 chrome_exe,
                 f"--user-data-dir={target_prof}",
+                "--remote-debugging-port=9222",
                 "--no-first-run",
                 "--no-default-browser-check"
             ] + urls)

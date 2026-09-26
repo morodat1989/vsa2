@@ -156,8 +156,8 @@ if not exist "!ACTIVE_PROFILE_DIR!" mkdir "!ACTIVE_PROFILE_DIR!" 2>nul
 if defined CHROME_EXE (
     if exist "%CHROME_EXE%" (
         echo [OK] Ungoogled Chromium: "%CHROME_EXE%"
-        echo [INFO] Dang mo Profile "!SELECTED_PROFILE!" voi 2 tab...
-        start "" "%CHROME_EXE%" --user-data-dir="!ACTIVE_PROFILE_DIR!" --no-first-run --no-default-browser-check "http://127.0.0.1:8000" "https://www.facebook.com"
+        echo [INFO] Dang mo Profile "!SELECTED_PROFILE!" voi 2 tab va Remote Debugging (port 9222)...
+        start "" "%CHROME_EXE%" --user-data-dir="!ACTIVE_PROFILE_DIR!" --remote-debugging-port=9222 --no-first-run --no-default-browser-check "http://127.0.0.1:8000" "https://www.facebook.com"
         goto DONE_ALL
     )
 )

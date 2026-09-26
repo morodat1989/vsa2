@@ -1,6 +1,32 @@
 {% extends "base.html" %}
 
 {% block content %}
+<!-- Live Status Bar -->
+<div class="card border-0 shadow-sm rounded-4 mb-4 bg-body-tertiary">
+  <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div class="d-flex align-items-center gap-2 small">
+      <span class="badge {{ 'bg-success' if stats.cdp and stats.cdp.running else 'bg-secondary' }} rounded-circle p-1"></span>
+      <span class="fw-semibold">Chromium Debug (9222):</span>
+      {% if stats.cdp and stats.cdp.running %}
+        <span class="text-success fw-bold"><i class="fa-solid fa-circle-check me-1"></i>Đã kết nối</span>
+        {% if stats.cdp.fb_tab_open %}
+          <span class="badge bg-primary-subtle text-primary ms-2"><i class="fa-brands fa-facebook me-1"></i>Tab FB đang mở</span>
+        {% endif %}
+      {% else %}
+        <span class="text-muted">Chưa kích hoạt</span>
+      {% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="/facebook/sync-profiles" class="btn btn-sm btn-outline-primary py-1 px-2 rounded-pill small">
+        <i class="fa-solid fa-arrows-rotate me-1"></i> Quét & Check Live
+      </a>
+      <a href="/facebook/accounts" class="btn btn-sm btn-light border py-1 px-2 rounded-pill small">
+        <i class="fa-solid fa-folder-open me-1"></i> {{ stats.totalAccounts }} Profile
+      </a>
+    </div>
+  </div>
+</div>
+
 <div class="row g-3 mb-4">
   <!-- Stat Card: Listings -->
   <div class="col-sm-6 col-xl-3">

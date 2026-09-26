@@ -82,20 +82,27 @@ def redirect_groups():
 def redirect_logs():
     return RedirectResponse(url="/facebook/logs", status_code=302)
 
+from app.routers.facebook import sync_profiles_to_db
+
 # ================= TRANG TỔNG QUAN (DASHBOARD) ================= #
 @app.get("/")
 def home(request: Request, db: Session = Depends(get_db)):
+    scan_result = sync_profiles_to_db(db)
     all_listings = db.query(Listing).order_by(Listing.id.desc()).all()
     all_accounts = db.query(FacebookAccount).all()
     all_groups = db.query(FacebookGroup).all()
     all_logs = db.query(PostLog).order_by(PostLog.id.desc()).all()
 
+    total_profiles = len(scan_result["profiles"])
+    live_profiles = scan_result["live_count"]
+
     stats = {
         "totalListings": len(all_listings),
-        "totalAccounts": len(all_accounts),
-        "liveAccounts": len([a for a in all_accounts if (a.status or "").lower() == "live"]),
+        "totalAccounts": max(len(all_accounts), total_profiles),
+        "liveAccounts": max(len([a for a in all_accounts if (a.status or "").lower() == "live"]), live_profiles),
         "totalGroups": len(all_groups),
-        "successfulPosts": len([l for l in all_logs if l.status == "success"])
+        "successfulPosts": len([l for l in all_logs if l.status == "success"]),
+        "cdp": scan_result["cdp"]
     }
 
     return templates.TemplateResponse(
@@ -106,6 +113,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "active_page": "dashboard",
             "page_title": "Tổng Quan Hệ Thống BĐS",
             "stats": stats,
+            "profiles": scan_result["profiles"],
             "recentListings": all_listings[:5]
         }
     )
