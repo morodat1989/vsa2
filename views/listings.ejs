@@ -1,24 +1,40 @@
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
   <div>
-    <h4 class="fw-bold mb-1">Kho Bất Động Sản</h4>
-    <p class="text-muted small mb-0">Quản lý toàn bộ danh mục sản phẩm nhà đất, căn hộ và tạo bài viết AI</p>
+    <h4 class="fw-bold mb-1"><i class="fa-solid fa-house-chimney text-primary me-2"></i>Kho Bất Động Sản</h4>
+    <p class="text-muted small mb-0">Quản lý toàn bộ danh mục sản phẩm nhà đất, căn hộ, thao tác hàng loạt và tạo bài viết AI</p>
   </div>
-  <button class="btn btn-gradient-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#addListingModal">
-    <i class="bi bi-plus-circle me-1"></i> Thêm BĐS Mới
-  </button>
+  <div class="d-flex align-items-center gap-2">
+    <!-- View Switcher -->
+    <div class="btn-group shadow-sm" role="group" aria-label="Chế độ xem">
+      <button type="button" class="btn btn-outline-secondary active" id="btnTableView" onclick="switchView('table')" title="Chế độ Bảng danh sách">
+        <i class="bi bi-table me-1"></i> Bảng
+      </button>
+      <button type="button" class="btn btn-outline-secondary" id="btnGridView" onclick="switchView('grid')" title="Chế độ Lưới thẻ">
+        <i class="bi bi-grid-fill me-1"></i> Thẻ
+      </button>
+    </div>
+
+    <button class="btn btn-gradient-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#addListingModal">
+      <i class="bi bi-plus-circle me-1"></i> Thêm BĐS Mới
+    </button>
+  </div>
 </div>
 
 <!-- Search & Filter bar -->
 <div class="card shadow-sm border-0 mb-4 bg-body">
   <div class="card-body p-3">
     <div class="row g-2 align-items-center">
-      <div class="col-md-5">
+      <div class="col-lg-4 col-md-6">
         <div class="input-group">
           <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search text-muted"></i></span>
-          <input type="text" id="listingSearchInput" class="form-control border-start-0" placeholder="Tìm theo tiêu đề, địa chỉ, số điện thoại..." onkeyup="filterListings()">
+          <input type="text" id="listingSearchInput" class="form-control border-start-0" placeholder="Tìm theo tiêu đề, địa chỉ, người liên hệ, SĐT..." onkeyup="filterListings()">
+          <button class="btn btn-outline-secondary border-start-0" type="button" onclick="clearSearch()" title="Xoá tìm kiếm">
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
       </div>
-      <div class="col-md-3">
+      
+      <div class="col-lg-3 col-md-3">
         <select id="priceFilter" class="form-select" onchange="filterListings()">
           <option value="all">Tất cả mức giá</option>
           <option value="under_3">Dưới 3 Tỷ</option>
@@ -26,23 +42,268 @@
           <option value="above_7">Trên 7 Tỷ</option>
         </select>
       </div>
-      <div class="col-md-4 text-md-end text-muted small">
-        Tổng số: <strong class="text-primary" id="totalListingsCount"><%= listings.length %></strong> bất động sản
+
+      <div class="col-lg-3 col-md-3">
+        <select id="statusFilter" class="form-select" onchange="filterListings()">
+          <option value="all">Tất cả trạng thái</option>
+          <option value="available">🟢 Đang bán</option>
+          <option value="reserved">🟡 Đã đặt cọc</option>
+          <option value="sold">🟣 Đã chốt bán</option>
+          <option value="paused">🔴 Tạm ngưng</option>
+        </select>
+      </div>
+
+      <div class="col-lg-2 col-md-12 text-lg-end text-muted small">
+        Hiển thị: <strong class="text-primary" id="visibleListingsCount"><%= listings.length %></strong> / <%= listings.length %> BĐS
       </div>
     </div>
   </div>
 </div>
 
-<!-- Listings Cards Grid -->
-<div class="row g-4" id="listingsContainer">
+<!-- ================= BULK ACTIONS FLOATING TOOLBAR ================= -->
+<div id="bulkActionBar" class="card shadow-lg border-primary border-2 mb-4 bg-body-tertiary transition-all" style="display: none; position: sticky; top: 72px; z-index: 1020;">
+  <div class="card-body p-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="checkbox" id="bulkBarSelectAll" onchange="toggleSelectAll(this.checked)">
+          <label class="form-check-label fw-bold text-primary" for="bulkBarSelectAll">
+            Đã chọn <span class="badge bg-primary rounded-pill px-2.5 py-1.5 fs-6" id="selectedCountBadge">0</span> BĐS
+          </label>
+        </div>
+        <span class="text-muted small d-none d-sm-inline">|</span>
+        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 d-none d-sm-inline" onclick="selectAllVisible()">
+          Chọn tất cả kết quả
+        </button>
+        <button type="button" class="btn btn-sm btn-link text-decoration-none text-secondary p-0" onclick="deselectAll()">
+          Bỏ chọn
+        </button>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+        <!-- Update Status Dropdown -->
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-primary dropdown-toggle rounded-pill fw-semibold px-3" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-tag me-1"></i> Cập nhật trạng thái
+          </button>
+          <ul class="dropdown-menu shadow border-0">
+            <li><h6 class="dropdown-header">Chọn trạng thái áp dụng hàng loạt:</h6></li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" onclick="bulkUpdateStatus('available')">
+                <span class="badge bg-success rounded-circle p-1"></span>
+                <span>Đang bán (Available)</span>
+              </button>
+            </li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" onclick="bulkUpdateStatus('reserved')">
+                <span class="badge bg-warning rounded-circle p-1"></span>
+                <span>Đã đặt cọc (Reserved)</span>
+              </button>
+            </li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" onclick="bulkUpdateStatus('sold')">
+                <span class="badge bg-secondary rounded-circle p-1"></span>
+                <span>Đã chốt bán (Sold)</span>
+              </button>
+            </li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2 text-danger" type="button" onclick="bulkUpdateStatus('paused')">
+                <span class="badge bg-danger rounded-circle p-1"></span>
+                <span>Tạm ngưng rao (Paused)</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Bulk Delete Button -->
+        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3" onclick="openBulkDeleteModal()">
+          <i class="bi bi-trash3 me-1"></i> Xóa hàng loạt
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 1. TABLE VIEW ================= -->
+<div id="tableViewContainer" class="card shadow-sm border-0 mb-4 bg-body overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" id="listingsTable">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 44px;" class="text-center">
+            <div class="form-check d-flex justify-content-center m-0">
+              <input class="form-check-input" type="checkbox" id="masterCheckbox" onchange="toggleSelectAll(this.checked)" title="Chọn / Bỏ chọn tất cả">
+            </div>
+          </th>
+          <th style="min-width: 280px;">Bất Động Sản</th>
+          <th style="width: 140px;">Giá Bán</th>
+          <th style="width: 130px;">Thông Số</th>
+          <th style="width: 150px;">Trạng Thái</th>
+          <th style="width: 180px;">Liên Hệ</th>
+          <th style="width: 110px;">Ngày Tạo</th>
+          <th style="width: 150px;" class="text-end pe-3">Thao Tác</th>
+        </tr>
+      </thead>
+      <tbody id="listingsTableBody">
+        <% if (listings && listings.length > 0) { %>
+          <% listings.forEach(item => { %>
+            <tr class="listing-row" 
+                id="row-<%= item.id %>"
+                data-id="<%= item.id %>"
+                data-title="<%= item.title.toLowerCase() %>" 
+                data-address="<%= item.address.toLowerCase() %>"
+                data-phone="<%= (item.contact_phone || '').toLowerCase() %>"
+                data-contact="<%= (item.contact_name || '').toLowerCase() %>"
+                data-price="<%= item.price || 0 %>"
+                data-status="<%= item.status || 'available' %>">
+              
+              <!-- Checkbox -->
+              <td class="text-center">
+                <div class="form-check d-flex justify-content-center m-0">
+                  <input class="form-check-input listing-checkbox" 
+                         type="checkbox" 
+                         value="<%= item.id %>" 
+                         id="check-table-<%= item.id %>"
+                         onchange="handleRowCheckboxChange(<%= item.id %>, this.checked)">
+                </div>
+              </td>
+
+              <!-- Title & Thumbnail -->
+              <td>
+                <div class="d-flex align-items-center gap-3">
+                  <div class="position-relative flex-shrink-0 rounded-3 overflow-hidden shadow-xs" style="width: 64px; height: 50px; background-color: #f1f5f9;">
+                    <img src="<%= item.images || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=200&auto=format&fit=crop&q=80' %>" 
+                         class="w-100 h-100 object-fit-cover" 
+                         alt="<%= item.title %>"
+                         onerror="this.src='https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=200&auto=format&fit=crop&q=80'">
+                  </div>
+                  <div class="overflow-hidden">
+                    <a href="/facebook/ai-write/<%= item.id %>" class="fw-bold text-decoration-none text-body text-truncate d-block mb-1" title="<%= item.title %>">
+                      <%= item.title %>
+                    </a>
+                    <div class="text-muted small text-truncate" style="max-width: 320px;" title="<%= item.address %>">
+                      <i class="bi bi-geo-alt-fill text-danger me-1"></i><%= item.address %>
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Price -->
+              <td>
+                <span class="badge bg-danger-subtle text-danger fs-6 fw-bold px-2.5 py-1 rounded-pill">
+                  <%= item.price ? item.price + ' Tỷ' : 'Thỏa thuận' %>
+                </span>
+              </td>
+
+              <!-- Specs -->
+              <td>
+                <div class="small">
+                  <% if (item.area) { %>
+                    <div class="text-body fw-semibold"><i class="bi bi-aspect-ratio text-muted me-1"></i><%= item.area %> m²</div>
+                  <% } %>
+                  <div class="text-muted" style="font-size: 0.78rem;">
+                    <%= item.bedrooms ? item.bedrooms + ' PN' : '' %>
+                    <%= item.bathrooms ? ' • ' + item.bathrooms + ' WC' : '' %>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Status -->
+              <td>
+                <div class="dropdown">
+                  <button class="btn btn-sm dropdown-toggle rounded-pill px-2.5 py-1 d-inline-flex align-items-center gap-1 status-btn-<%= item.id %> 
+                    <%= item.status === 'reserved' ? 'btn-warning text-dark' : (item.status === 'sold' ? 'btn-secondary text-white' : (item.status === 'paused' ? 'btn-danger text-white' : 'btn-success text-white')) %>" 
+                    type="button" 
+                    data-bs-toggle="dropdown" 
+                    aria-expanded="false"
+                    title="Bấm để đổi trạng thái nhanh">
+                    <span id="status-label-<%= item.id %>">
+                      <%= item.status === 'reserved' ? 'Đã cọc' : (item.status === 'sold' ? 'Đã chốt' : (item.status === 'paused' ? 'Tạm ngưng' : 'Đang bán')) %>
+                    </span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="font-size: 0.85rem;">
+                    <li><h6 class="dropdown-header">Chuyển trạng thái:</h6></li>
+                    <li><button class="dropdown-item" type="button" onclick="singleUpdateStatus(<%= item.id %>, 'available')">🟢 Đang bán</button></li>
+                    <li><button class="dropdown-item" type="button" onclick="singleUpdateStatus(<%= item.id %>, 'reserved')">🟡 Đã đặt cọc</button></li>
+                    <li><button class="dropdown-item" type="button" onclick="singleUpdateStatus(<%= item.id %>, 'sold')">🟣 Đã chốt bán</button></li>
+                    <li><button class="dropdown-item text-danger" type="button" onclick="singleUpdateStatus(<%= item.id %>, 'paused')">🔴 Tạm ngưng</button></li>
+                  </ul>
+                </div>
+              </td>
+
+              <!-- Contact -->
+              <td>
+                <div class="small">
+                  <div class="fw-semibold text-truncate" style="max-width: 140px;"><%= item.contact_name || 'Chính chủ' %></div>
+                  <div class="text-success fw-bold font-monospace"><i class="bi bi-telephone-outbound me-1"></i><%= item.contact_phone || '---' %></div>
+                </div>
+              </td>
+
+              <!-- Created At -->
+              <td>
+                <span class="text-muted small"><%= item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '---' %></span>
+              </td>
+
+              <!-- Actions -->
+              <td class="text-end pe-3">
+                <div class="d-inline-flex gap-1">
+                  <a href="/facebook/ai-write/<%= item.id %>" class="btn btn-sm btn-outline-primary rounded-pill px-2.5" title="Soạn bài AI">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  </a>
+                  <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5" onclick="openEditModal(<%= JSON.stringify(item) %>)" title="Chỉnh sửa">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2.5" onclick="confirmSingleDelete(<%= item.id %>, '<%= item.title.replace(/'/g, "\\'") %>')" title="Xoá">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        <% } else { %>
+          <tr id="tableEmptyRow">
+            <td colspan="8" class="text-center py-5">
+              <div class="p-4 text-muted">
+                <i class="bi bi-house-door fs-1 d-block mb-3 opacity-50"></i>
+                <h6>Kho bất động sản đang trống</h6>
+                <p class="small mb-3">Thêm bất động sản đầu tiên để trải nghiệm công cụ quản lý và viết bài AI!</p>
+                <button class="btn btn-sm btn-gradient-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addListingModal">
+                  <i class="bi bi-plus-circle me-1"></i> Thêm BĐS Ngay
+                </button>
+              </div>
+            </td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================= 2. GRID / CARDS VIEW ================= -->
+<div class="row g-4" id="listingsContainer" style="display: none;">
   <% if (listings && listings.length > 0) { %>
     <% listings.forEach(item => { %>
-      <div class="col-md-6 col-xl-4 listing-item" 
+      <div class="col-md-6 col-xl-4 listing-card-item" 
+           id="card-<%= item.id %>"
+           data-id="<%= item.id %>"
            data-title="<%= item.title.toLowerCase() %>" 
            data-address="<%= item.address.toLowerCase() %>"
            data-phone="<%= (item.contact_phone || '').toLowerCase() %>"
-           data-price="<%= item.price || 0 %>">
-        <div class="card h-100 shadow-sm border-0 overflow-hidden stat-card">
+           data-contact="<%= (item.contact_name || '').toLowerCase() %>"
+           data-price="<%= item.price || 0 %>"
+           data-status="<%= item.status || 'available' %>">
+        <div class="card h-100 shadow-sm border-0 overflow-hidden stat-card position-relative card-listing-box">
+          <!-- Selection Checkbox overlay -->
+          <div class="position-absolute top-0 start-0 m-2" style="z-index: 5;">
+            <div class="form-check bg-body bg-opacity-90 rounded-circle p-2 shadow-sm d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+              <input class="form-check-input listing-checkbox m-0" 
+                     type="checkbox" 
+                     value="<%= item.id %>" 
+                     id="check-card-<%= item.id %>"
+                     onchange="handleRowCheckboxChange(<%= item.id %>, this.checked)">
+            </div>
+          </div>
+
           <!-- Image Header -->
           <div class="position-relative" style="height: 190px; background-color: #f1f5f9;">
             <img src="<%= item.images || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&auto=format&fit=crop&q=80' %>" 
@@ -51,8 +312,8 @@
                  onerror="this.src='https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&auto=format&fit=crop&q=80'">
             
             <div class="position-absolute top-0 end-0 m-2">
-              <span class="badge bg-dark bg-opacity-75 rounded-pill px-2 py-1">
-                <i class="bi bi-clock me-1"></i><%= new Date(item.created_at).toLocaleDateString('vi-VN') %>
+              <span class="badge <%= item.status === 'reserved' ? 'bg-warning text-dark' : (item.status === 'sold' ? 'bg-secondary' : (item.status === 'paused' ? 'bg-danger' : 'bg-success')) %> rounded-pill px-2.5 py-1 shadow-sm">
+                <%= item.status === 'reserved' ? 'Đã cọc' : (item.status === 'sold' ? 'Đã bán' : (item.status === 'paused' ? 'Tạm ngưng' : 'Đang bán')) %>
               </span>
             </div>
 
@@ -101,29 +362,62 @@
               <button class="btn btn-outline-secondary btn-sm rounded-pill px-2.5" onclick="openEditModal(<%= JSON.stringify(item) %>)" title="Chỉnh sửa">
                 <i class="bi bi-pencil"></i>
               </button>
-              <form action="/listings/delete/<%= item.id %>" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xoá BĐS này?');" class="d-inline">
-                <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-2.5" title="Xoá">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </form>
+              <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-2.5" onclick="confirmSingleDelete(<%= item.id %>, '<%= item.title.replace(/'/g, "\\'") %>')" title="Xoá">
+                <i class="bi bi-trash"></i>
+              </button>
             </div>
           </div>
         </div>
       </div>
     <% }); %>
-  <% } else { %>
-    <div class="col-12 text-center py-5">
-      <div class="p-5 bg-body-tertiary rounded-4 border">
-        <i class="bi bi-house-door fs-1 text-muted d-block mb-3"></i>
-        <h5>Kho bất động sản đang trống</h5>
-        <p class="text-muted">Thêm bất động sản đầu tiên để trải nghiệm tính năng viết bài và đăng tin bằng AI!</p>
-        <button class="btn btn-gradient-primary rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#addListingModal">
-          <i class="bi bi-plus-circle me-1"></i> Thêm BĐS Ngay
+  <% } %>
+</div>
+
+<!-- ================= MODAL: XÓA HÀNG LOẠT ================= -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom bg-danger bg-opacity-10 text-danger">
+        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Xác Nhận Xóa Hàng Loạt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="mb-3">Bạn có chắc chắn muốn xóa vĩnh viễn <strong class="text-danger" id="bulkDeleteCountText">0</strong> bất động sản đã chọn?</p>
+        <div class="alert alert-warning small mb-0">
+          <i class="bi bi-info-circle me-1"></i> Thao tác này không thể hoàn tác sau khi thực hiện.
+        </div>
+      </div>
+      <div class="modal-footer border-top bg-body-tertiary">
+        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Hủy bỏ</button>
+        <button type="button" class="btn btn-danger rounded-pill px-4 fw-bold" id="confirmBulkDeleteBtn" onclick="executeBulkDelete()">
+          <i class="bi bi-trash3 me-1"></i> Đồng Ý Xóa
         </button>
       </div>
     </div>
-  <% } %>
+  </div>
 </div>
+
+<!-- ================= MODAL: XÓA ĐƠN LẺ ================= -->
+<form id="singleDeleteForm" method="POST" action="">
+  <div class="modal fade" id="singleDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header border-bottom bg-danger bg-opacity-10 text-danger">
+          <h5 class="modal-title fw-bold"><i class="bi bi-trash me-2"></i>Xác Nhận Xóa BĐS</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <p class="mb-2">Bạn có chắc chắn muốn xóa bất động sản sau:</p>
+          <div class="p-3 bg-body-secondary rounded-3 fw-bold" id="singleDeleteTitleText"></div>
+        </div>
+        <div class="modal-footer border-top bg-body-tertiary">
+          <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Hủy</button>
+          <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">Xóa BĐS</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
 
 <!-- Modal: Thêm BĐS Mới -->
 <div class="modal fade" id="addListingModal" tabindex="-1">
@@ -144,13 +438,22 @@
               <label class="form-label fw-semibold">Địa chỉ / Vị trí <span class="text-danger">*</span></label>
               <input type="text" name="address" class="form-control" placeholder="VD: 125 Đinh Bộ Lĩnh, P.26, Bình Thạnh, TP.HCM" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label fw-semibold">Giá bán (Tỷ VNĐ) <span class="text-danger">*</span></label>
               <input type="number" step="0.01" name="price" class="form-control" placeholder="VD: 8.5" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label fw-semibold">Diện tích (m²)</label>
               <input type="number" step="0.1" name="area" class="form-control" placeholder="VD: 85">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Trạng thái bán</label>
+              <select name="status" class="form-select">
+                <option value="available" selected>🟢 Đang bán</option>
+                <option value="reserved">🟡 Đã đặt cọc</option>
+                <option value="sold">🟣 Đã chốt bán</option>
+                <option value="paused">🔴 Tạm ngưng</option>
+              </select>
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">Số phòng ngủ</label>
@@ -227,13 +530,22 @@
               <label class="form-label fw-semibold">Địa chỉ / Vị trí</label>
               <input type="text" id="edit_address" name="address" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label fw-semibold">Giá bán (Tỷ VNĐ)</label>
               <input type="number" step="0.01" id="edit_price" name="price" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label fw-semibold">Diện tích (m²)</label>
               <input type="number" step="0.1" id="edit_area" name="area" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Trạng thái bán</label>
+              <select id="edit_status" name="status" class="form-select">
+                <option value="available">🟢 Đang bán</option>
+                <option value="reserved">🟡 Đã đặt cọc</option>
+                <option value="sold">🟣 Đã chốt bán</option>
+                <option value="paused">🔴 Tạm ngưng</option>
+              </select>
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">Số phòng ngủ</label>
@@ -282,13 +594,385 @@
   </div>
 </div>
 
+<style>
+  .listing-row.selected-row {
+    background-color: rgba(37, 99, 235, 0.08) !important;
+  }
+  .card-listing-box.selected-card {
+    border: 2px solid var(--bs-primary) !important;
+    background-color: rgba(37, 99, 235, 0.03);
+  }
+</style>
+
 <script>
+  // Global selected IDs Set
+  let selectedIds = new Set();
+
+  function switchView(mode) {
+    const tableView = document.getElementById('tableViewContainer');
+    const gridView = document.getElementById('listingsContainer');
+    const btnTable = document.getElementById('btnTableView');
+    const btnGrid = document.getElementById('btnGridView');
+
+    if (mode === 'grid') {
+      tableView.style.display = 'none';
+      gridView.style.display = 'flex';
+      btnTable.classList.remove('active');
+      btnGrid.classList.add('active');
+      localStorage.setItem('listings_view_mode', 'grid');
+    } else {
+      tableView.style.display = 'block';
+      gridView.style.display = 'none';
+      btnTable.classList.add('active');
+      btnGrid.classList.remove('active');
+      localStorage.setItem('listings_view_mode', 'table');
+    }
+  }
+
+  // Restore saved view mode
+  document.addEventListener('DOMContentLoaded', () => {
+    const savedMode = localStorage.getItem('listings_view_mode') || 'table';
+    switchView(savedMode);
+    updateSelectionUI();
+  });
+
+  // Handle individual row checkbox toggle
+  function handleRowCheckboxChange(id, isChecked) {
+    id = Number(id);
+    if (isChecked) {
+      selectedIds.add(id);
+    } else {
+      selectedIds.delete(id);
+    }
+    syncCheckboxElements(id, isChecked);
+    updateSelectionUI();
+  }
+
+  // Sync checkboxes across both table and grid views
+  function syncCheckboxElements(id, isChecked) {
+    const tableCb = document.getElementById('check-table-' + id);
+    const cardCb = document.getElementById('check-card-' + id);
+    const rowEl = document.getElementById('row-' + id);
+    const cardEl = document.getElementById('card-' + id);
+
+    if (tableCb) tableCb.checked = isChecked;
+    if (cardCb) cardCb.checked = isChecked;
+
+    if (rowEl) {
+      if (isChecked) rowEl.classList.add('selected-row');
+      else rowEl.classList.remove('selected-row');
+    }
+
+    if (cardEl) {
+      const cardBox = cardEl.querySelector('.card-listing-box');
+      if (cardBox) {
+        if (isChecked) cardBox.classList.add('selected-card');
+        else cardBox.classList.remove('selected-card');
+      }
+    }
+  }
+
+  // Master Checkbox Toggle (Select/Deselect visible items)
+  function toggleSelectAll(isChecked) {
+    const visibleRows = getVisibleElements();
+    visibleRows.forEach(el => {
+      const id = Number(el.getAttribute('data-id'));
+      if (id) {
+        if (isChecked) {
+          selectedIds.add(id);
+        } else {
+          selectedIds.delete(id);
+        }
+        syncCheckboxElements(id, isChecked);
+      }
+    });
+    updateSelectionUI();
+  }
+
+  // Select all visible listings
+  function selectAllVisible() {
+    toggleSelectAll(true);
+  }
+
+  // Deselect all
+  function deselectAll() {
+    selectedIds.clear();
+    document.querySelectorAll('.listing-checkbox').forEach(cb => {
+      cb.checked = false;
+    });
+    document.querySelectorAll('.listing-row').forEach(r => r.classList.remove('selected-row'));
+    document.querySelectorAll('.card-listing-box').forEach(c => c.classList.remove('selected-card'));
+    updateSelectionUI();
+  }
+
+  // Get currently visible items based on search/filter
+  function getVisibleElements() {
+    const mode = localStorage.getItem('listings_view_mode') || 'table';
+    if (mode === 'grid') {
+      return Array.from(document.querySelectorAll('.listing-card-item')).filter(el => el.style.display !== 'none');
+    }
+    return Array.from(document.querySelectorAll('.listing-row')).filter(el => el.style.display !== 'none');
+  }
+
+  // Update selection UI (Toolbar, badges, master checkbox indeterminate state)
+  function updateSelectionUI() {
+    const count = selectedIds.size;
+    const bulkBar = document.getElementById('bulkActionBar');
+    const badge = document.getElementById('selectedCountBadge');
+    const masterCb = document.getElementById('masterCheckbox');
+    const bulkBarCb = document.getElementById('bulkBarSelectAll');
+
+    if (badge) badge.textContent = count;
+
+    if (count > 0) {
+      bulkBar.style.display = 'block';
+    } else {
+      bulkBar.style.display = 'none';
+    }
+
+    // Determine master checkbox state based on visible items
+    const visibleElements = getVisibleElements();
+    const visibleCount = visibleElements.length;
+
+    let selectedVisibleCount = 0;
+    visibleElements.forEach(el => {
+      const id = Number(el.getAttribute('data-id'));
+      if (selectedIds.has(id)) {
+        selectedVisibleCount++;
+      }
+    });
+
+    const isAllVisibleSelected = visibleCount > 0 && selectedVisibleCount === visibleCount;
+    const isSomeVisibleSelected = selectedVisibleCount > 0 && selectedVisibleCount < visibleCount;
+
+    if (masterCb) {
+      masterCb.checked = isAllVisibleSelected;
+      masterCb.indeterminate = isSomeVisibleSelected;
+    }
+    if (bulkBarCb) {
+      bulkBarCb.checked = isAllVisibleSelected;
+      bulkBarCb.indeterminate = isSomeVisibleSelected;
+    }
+  }
+
+  // Filter listings
+  function filterListings() {
+    const q = document.getElementById('listingSearchInput').value.toLowerCase().trim();
+    const priceFilter = document.getElementById('priceFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+
+    const rows = document.querySelectorAll('.listing-row');
+    const cards = document.querySelectorAll('.listing-card-item');
+
+    let visibleCount = 0;
+
+    function checkItem(el) {
+      const title = el.getAttribute('data-title') || '';
+      const address = el.getAttribute('data-address') || '';
+      const phone = el.getAttribute('data-phone') || '';
+      const contact = el.getAttribute('data-contact') || '';
+      const price = parseFloat(el.getAttribute('data-price')) || 0;
+      const status = el.getAttribute('data-status') || 'available';
+
+      let matchesSearch = !q || title.includes(q) || address.includes(q) || phone.includes(q) || contact.includes(q);
+      let matchesPrice = true;
+      let matchesStatus = (statusFilter === 'all' || status === statusFilter);
+
+      if (priceFilter === 'under_3') {
+        matchesPrice = price > 0 && price < 3;
+      } else if (priceFilter === '3_to_7') {
+        matchesPrice = price >= 3 && price <= 7;
+      } else if (priceFilter === 'above_7') {
+        matchesPrice = price > 7;
+      }
+
+      return matchesSearch && matchesPrice && matchesStatus;
+    }
+
+    rows.forEach(el => {
+      const isVisible = checkItem(el);
+      el.style.display = isVisible ? '' : 'none';
+      if (isVisible) visibleCount++;
+    });
+
+    cards.forEach(el => {
+      const isVisible = checkItem(el);
+      el.style.display = isVisible ? 'block' : 'none';
+    });
+
+    document.getElementById('visibleListingsCount').textContent = visibleCount;
+    updateSelectionUI();
+  }
+
+  function clearSearch() {
+    document.getElementById('listingSearchInput').value = '';
+    filterListings();
+  }
+
+  // Open Bulk Delete Modal
+  function openBulkDeleteModal() {
+    if (selectedIds.size === 0) {
+      if (typeof showToast === 'function') showToast('Vui lòng chọn ít nhất một bất động sản!', false);
+      return;
+    }
+    document.getElementById('bulkDeleteCountText').textContent = selectedIds.size;
+    const modal = new bootstrap.Modal(document.getElementById('bulkDeleteModal'));
+    modal.show();
+  }
+
+  // Execute Bulk Delete via fetch
+  async function executeBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    const btn = document.getElementById('confirmBulkDeleteBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Đang xóa...';
+
+    try {
+      const res = await fetch('/listings/bulk-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ ids })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof showToast === 'function') showToast(data.message || `Đã xóa ${ids.length} BĐS thành công!`);
+        // Remove deleted items from DOM
+        ids.forEach(id => {
+          const row = document.getElementById('row-' + id);
+          const card = document.getElementById('card-' + id);
+          if (row) row.remove();
+          if (card) card.remove();
+          selectedIds.delete(id);
+        });
+        bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal')).hide();
+        filterListings();
+        updateSelectionUI();
+      } else {
+        alert(data.message || 'Lỗi khi xóa hàng loạt');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối máy chủ: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-trash3 me-1"></i> Đồng Ý Xóa';
+    }
+  }
+
+  // Bulk update status via fetch
+  async function bulkUpdateStatus(newStatus) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      if (typeof showToast === 'function') showToast('Vui lòng chọn ít nhất một bất động sản!', false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/listings/bulk-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ ids, status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof showToast === 'function') showToast(data.message || 'Cập nhật trạng thái thành công!');
+        
+        // Update DOM for each updated item
+        ids.forEach(id => {
+          updateItemStatusInDOM(id, newStatus);
+        });
+        deselectAll();
+      } else {
+        alert(data.message || 'Lỗi khi cập nhật trạng thái');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối máy chủ: ' + err.message);
+    }
+  }
+
+  // Single status update helper
+  async function singleUpdateStatus(id, newStatus) {
+    try {
+      const res = await fetch('/listings/bulk-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ ids: [id], status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        updateItemStatusInDOM(id, newStatus);
+        if (typeof showToast === 'function') showToast(data.message || 'Đã cập nhật trạng thái!');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function updateItemStatusInDOM(id, newStatus) {
+    const statusLabels = {
+      available: 'Đang bán',
+      reserved: 'Đã cọc',
+      sold: 'Đã chốt',
+      paused: 'Tạm ngưng'
+    };
+    const statusClasses = {
+      available: 'btn-success text-white',
+      reserved: 'btn-warning text-dark',
+      sold: 'btn-secondary text-white',
+      paused: 'btn-danger text-white'
+    };
+
+    const row = document.getElementById('row-' + id);
+    const card = document.getElementById('card-' + id);
+
+    if (row) {
+      row.setAttribute('data-status', newStatus);
+      const labelEl = document.getElementById('status-label-' + id);
+      const btnEl = row.querySelector('.status-btn-' + id);
+      if (labelEl) labelEl.textContent = statusLabels[newStatus] || newStatus;
+      if (btnEl) {
+        btnEl.className = `btn btn-sm dropdown-toggle rounded-pill px-2.5 py-1 d-inline-flex align-items-center gap-1 status-btn-${id} ${statusClasses[newStatus]}`;
+      }
+    }
+
+    if (card) {
+      card.setAttribute('data-status', newStatus);
+      const badge = card.querySelector('.badge.position-absolute');
+      if (badge) {
+        badge.textContent = statusLabels[newStatus] || newStatus;
+        badge.className = `badge ${newStatus === 'reserved' ? 'bg-warning text-dark' : (newStatus === 'sold' ? 'bg-secondary' : (newStatus === 'paused' ? 'bg-danger' : 'bg-success'))} rounded-pill px-2.5 py-1 shadow-sm`;
+      }
+    }
+  }
+
+  // Single delete confirmation
+  function confirmSingleDelete(id, title) {
+    document.getElementById('singleDeleteForm').action = '/listings/delete/' + id;
+    document.getElementById('singleDeleteTitleText').textContent = title || ('BĐS #' + id);
+    const modal = new bootstrap.Modal(document.getElementById('singleDeleteModal'));
+    modal.show();
+  }
+
+  // Open Edit Modal
   function openEditModal(item) {
     document.getElementById('editListingForm').action = '/listings/update/' + item.id;
     document.getElementById('edit_title').value = item.title || '';
     document.getElementById('edit_address').value = item.address || '';
     document.getElementById('edit_price').value = item.price || 0;
     document.getElementById('edit_area').value = item.area || 0;
+    document.getElementById('edit_status').value = item.status || 'available';
     document.getElementById('edit_bedrooms').value = item.bedrooms || 0;
     document.getElementById('edit_bathrooms').value = item.bathrooms || 0;
     document.getElementById('edit_direction').value = item.direction || '';
@@ -301,39 +985,5 @@
 
     const modal = new bootstrap.Modal(document.getElementById('editListingModal'));
     modal.show();
-  }
-
-  function filterListings() {
-    const q = document.getElementById('listingSearchInput').value.toLowerCase().trim();
-    const priceFilter = document.getElementById('priceFilter').value;
-    const items = document.querySelectorAll('.listing-item');
-    let visibleCount = 0;
-
-    items.forEach(el => {
-      const title = el.getAttribute('data-title') || '';
-      const address = el.getAttribute('data-address') || '';
-      const phone = el.getAttribute('data-phone') || '';
-      const price = parseFloat(el.getAttribute('data-price')) || 0;
-
-      let matchesSearch = !q || title.includes(q) || address.includes(q) || phone.includes(q);
-      let matchesPrice = true;
-
-      if (priceFilter === 'under_3') {
-        matchesPrice = price > 0 && price < 3;
-      } else if (priceFilter === '3_to_7') {
-        matchesPrice = price >= 3 && price <= 7;
-      } else if (priceFilter === 'above_7') {
-        matchesPrice = price > 7;
-      }
-
-      if (matchesSearch && matchesPrice) {
-        el.style.display = 'block';
-        visibleCount++;
-      } else {
-        el.style.display = 'none';
-      }
-    });
-
-    document.getElementById('totalListingsCount').textContent = visibleCount;
   }
 </script>

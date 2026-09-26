@@ -101,6 +101,83 @@ app.post('/listings/delete/:id', (req, res) => {
   }
 });
 
+// Bulk batch operations
+app.post('/listings/bulk-delete', (req, res) => {
+  try {
+    let ids = req.body.ids;
+    if (typeof ids === 'string') {
+      try {
+        ids = JSON.parse(ids);
+      } catch (e) {
+        ids = ids.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+    if (!Array.isArray(ids) || ids.length === 0) {
+      if (req.xhr || req.headers.accept?.includes('application/json')) {
+        return res.status(400).json({ success: false, message: 'Chưa chọn bất động sản nào để xoá' });
+      }
+      return res.redirect('/listings?error=' + encodeURIComponent('Chưa chọn bất động sản nào để xoá'));
+    }
+
+    const count = db.deleteListings(ids);
+    const msg = `Đã xoá thành công ${count} bất động sản được chọn!`;
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+      return res.json({ success: true, count, message: msg });
+    }
+    res.redirect('/listings?success=' + encodeURIComponent(msg));
+  } catch (err) {
+    console.error("Bulk delete error:", err);
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+    res.redirect('/listings?error=' + encodeURIComponent('Lỗi xoá hàng loạt: ' + err.message));
+  }
+});
+
+app.post('/listings/bulk-status', (req, res) => {
+  try {
+    let { ids, status } = req.body;
+    if (typeof ids === 'string') {
+      try {
+        ids = JSON.parse(ids);
+      } catch (e) {
+        ids = ids.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+    if (!Array.isArray(ids) || ids.length === 0) {
+      if (req.xhr || req.headers.accept?.includes('application/json')) {
+        return res.status(400).json({ success: false, message: 'Chưa chọn bất động sản nào để cập nhật' });
+      }
+      return res.redirect('/listings?error=' + encodeURIComponent('Chưa chọn bất động sản nào để cập nhật'));
+    }
+
+    if (!status) {
+      status = 'available';
+    }
+
+    const count = db.updateListingsStatus(ids, status);
+    const statusLabels = {
+      available: 'Đang bán',
+      reserved: 'Đã đặt cọc',
+      sold: 'Đã chốt bán',
+      paused: 'Tạm ngưng'
+    };
+    const statusText = statusLabels[status] || status;
+    const msg = `Đã cập nhật trạng thái sang "${statusText}" cho ${count} bất động sản!`;
+
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+      return res.json({ success: true, count, status, message: msg });
+    }
+    res.redirect('/listings?success=' + encodeURIComponent(msg));
+  } catch (err) {
+    console.error("Bulk status error:", err);
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+    res.redirect('/listings?error=' + encodeURIComponent('Lỗi cập nhật hàng loạt: ' + err.message));
+  }
+});
+
 // 3. AI Writing & Posting
 app.get('/facebook/ai-write/:listing_id', async (req, res) => {
   try {

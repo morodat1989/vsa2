@@ -1,20 +1,216 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
   <div>
     <h4 class="fw-bold mb-1"><i class="fa-solid fa-house-chimney text-primary me-2"></i>Kho Bất Động Sản</h4>
-    <p class="text-muted mb-0 small">Danh sách các căn hộ, nhà đất cần đăng bài bán và cho thuê.</p>
+    <p class="text-muted mb-0 small">Quản lý toàn bộ danh mục sản phẩm nhà đất, căn hộ và thao tác hàng loạt.</p>
   </div>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addListingModal">
-    <i class="fa-solid fa-plus me-1"></i> Thêm BĐS Mới
-  </button>
+  <div class="d-flex align-items-center gap-2">
+    <!-- View Switcher -->
+    <div class="btn-group shadow-sm" role="group">
+      <button type="button" class="btn btn-outline-secondary active" id="btnTableView" onclick="switchView('table')">
+        <i class="fa-solid fa-table-list me-1"></i> Bảng
+      </button>
+      <button type="button" class="btn btn-outline-secondary" id="btnGridView" onclick="switchView('grid')">
+        <i class="fa-solid fa-grip me-1"></i> Thẻ
+      </button>
+    </div>
+
+    <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addListingModal">
+      <i class="fa-solid fa-plus me-1"></i> Thêm BĐS Mới
+    </button>
+  </div>
 </div>
 
-<div class="row g-4">
+<!-- Search & Filter bar -->
+<div class="card shadow-sm border-0 mb-4 bg-body">
+  <div class="card-body p-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-lg-5 col-md-6">
+        <div class="input-group">
+          <span class="input-group-text bg-transparent border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+          <input type="text" id="listingSearchInput" class="form-control border-start-0" placeholder="Tìm theo tiêu đề, địa chỉ..." onkeyup="filterListings()">
+        </div>
+      </div>
+      
+      <div class="col-lg-4 col-md-6">
+        <select id="statusFilter" class="form-select" onchange="filterListings()">
+          <option value="all">Tất cả trạng thái</option>
+          <option value="available">🟢 Đang bán</option>
+          <option value="reserved">🟡 Đã đặt cọc</option>
+          <option value="sold">🟣 Đã chốt bán</option>
+          <option value="paused">🔴 Tạm ngưng</option>
+        </select>
+      </div>
+
+      <div class="col-lg-3 col-md-12 text-lg-end text-muted small">
+        Hiển thị: <strong class="text-primary" id="visibleListingsCount">{{ listings|length }}</strong> / {{ listings|length }} BĐS
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= BULK ACTIONS FLOATING TOOLBAR ================= -->
+<div id="bulkActionBar" class="card shadow-lg border-primary border-2 mb-4 bg-body-tertiary" style="display: none; position: sticky; top: 15px; z-index: 1020;">
+  <div class="card-body p-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="checkbox" id="bulkBarSelectAll" onchange="toggleSelectAll(this.checked)">
+          <label class="form-check-label fw-bold text-primary" for="bulkBarSelectAll">
+            Đã chọn <span class="badge bg-primary rounded-pill px-2.5 py-1 fs-6" id="selectedCountBadge">0</span> BĐS
+          </label>
+        </div>
+        <span class="text-muted small">|</span>
+        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllVisible()">
+          Chọn tất cả kết quả
+        </button>
+        <button type="button" class="btn btn-sm btn-link text-decoration-none text-secondary p-0" onclick="deselectAll()">
+          Bỏ chọn
+        </button>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+        <!-- Status Update Dropdown -->
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-primary dropdown-toggle rounded-pill fw-semibold px-3" type="button" data-bs-toggle="dropdown">
+            <i class="fa-solid fa-tag me-1"></i> Cập nhật trạng thái
+          </button>
+          <ul class="dropdown-menu shadow border-0">
+            <li><button class="dropdown-item" type="button" onclick="bulkUpdateStatus('available')">🟢 Đang bán</button></li>
+            <li><button class="dropdown-item" type="button" onclick="bulkUpdateStatus('reserved')">🟡 Đã đặt cọc</button></li>
+            <li><button class="dropdown-item" type="button" onclick="bulkUpdateStatus('sold')">🟣 Đã chốt bán</button></li>
+            <li><button class="dropdown-item text-danger" type="button" onclick="bulkUpdateStatus('paused')">🔴 Tạm ngưng</button></li>
+          </ul>
+        </div>
+
+        <!-- Bulk Delete Button -->
+        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill fw-semibold px-3" onclick="openBulkDeleteModal()">
+          <i class="fa-solid fa-trash-can me-1"></i> Xóa hàng loạt
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 1. TABLE VIEW ================= -->
+<div id="tableViewContainer" class="card shadow-sm border-0 mb-4 bg-body overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 44px;" class="text-center">
+            <div class="form-check d-flex justify-content-center m-0">
+              <input class="form-check-input" type="checkbox" id="masterCheckbox" onchange="toggleSelectAll(this.checked)" title="Chọn / Bỏ chọn tất cả">
+            </div>
+          </th>
+          <th style="min-width: 280px;">Bất Động Sản</th>
+          <th style="width: 140px;">Giá Bán</th>
+          <th style="width: 130px;">Diện Tích</th>
+          <th style="width: 150px;">Trạng Thái</th>
+          <th style="width: 150px;" class="text-end pe-3">Thao Tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in listings %}
+        <tr class="listing-row" 
+            id="row-{{ item.id }}"
+            data-id="{{ item.id }}"
+            data-title="{{ item.title|lower }}" 
+            data-location="{{ item.location|lower }}"
+            data-status="{{ item.status or 'available' }}">
+          <td class="text-center">
+            <div class="form-check d-flex justify-content-center m-0">
+              <input class="form-check-input listing-checkbox" 
+                     type="checkbox" 
+                     value="{{ item.id }}" 
+                     id="check-table-{{ item.id }}"
+                     onchange="handleRowCheckboxChange({{ item.id }}, this.checked)">
+            </div>
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-3">
+              <div class="rounded-3 overflow-hidden flex-shrink-0" style="width: 60px; height: 48px; background-color: #f1f5f9;">
+                {% if item.image_url %}
+                <img src="{{ item.image_url }}" class="w-100 h-100 object-fit-cover" alt="{{ item.title }}" onerror="this.src='https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=200&auto=format&fit=crop&q=80'">
+                {% else %}
+                <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted"><i class="fa-solid fa-image"></i></div>
+                {% endif %}
+              </div>
+              <div class="overflow-hidden">
+                <a href="/facebook/ai-write/{{ item.id }}" class="fw-bold text-decoration-none text-body text-truncate d-block mb-1" title="{{ item.title }}">{{ item.title }}</a>
+                <div class="text-muted small text-truncate" style="max-width: 320px;"><i class="fa-solid fa-location-dot text-danger me-1"></i>{{ item.location }}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="badge bg-danger-subtle text-danger fs-6 fw-bold px-2.5 py-1 rounded-pill">{{ item.price }} Tỷ</span>
+          </td>
+          <td>
+            <span class="badge bg-primary-subtle text-primary">{{ item.area }} m²</span>
+          </td>
+          <td>
+            <div class="dropdown">
+              <button class="btn btn-sm dropdown-toggle rounded-pill px-2.5 py-1 status-btn-{{ item.id }} 
+                {% if item.status == 'reserved' %}btn-warning text-dark{% elif item.status == 'sold' %}btn-secondary text-white{% elif item.status == 'paused' %}btn-danger text-white{% else %}btn-success text-white{% endif %}" 
+                type="button" data-bs-toggle="dropdown">
+                <span id="status-label-{{ item.id }}">
+                  {% if item.status == 'reserved' %}Đã cọc{% elif item.status == 'sold' %}Đã chốt{% elif item.status == 'paused' %}Tạm ngưng{% else %}Đang bán{% endif %}
+                </span>
+              </button>
+              <ul class="dropdown-menu shadow border-0" style="font-size: 0.85rem;">
+                <li><button class="dropdown-item" type="button" onclick="singleUpdateStatus({{ item.id }}, 'available')">🟢 Đang bán</button></li>
+                <li><button class="dropdown-item" type="button" onclick="singleUpdateStatus({{ item.id }}, 'reserved')">🟡 Đã đặt cọc</button></li>
+                <li><button class="dropdown-item" type="button" onclick="singleUpdateStatus({{ item.id }}, 'sold')">🟣 Đã chốt bán</button></li>
+                <li><button class="dropdown-item text-danger" type="button" onclick="singleUpdateStatus({{ item.id }}, 'paused')">🔴 Tạm ngưng</button></li>
+              </ul>
+            </div>
+          </td>
+          <td class="text-end pe-3">
+            <div class="d-inline-flex gap-1">
+              <a href="/facebook/ai-write/{{ item.id }}" class="btn btn-sm btn-outline-success rounded-pill px-2.5" title="AI Viết Bài">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+              </a>
+              <a href="/listings/delete/{{ item.id }}" class="btn btn-sm btn-outline-danger rounded-pill px-2.5" onclick="return confirm('Bạn có chắc muốn xóa BĐS này?')">
+                <i class="fa-solid fa-trash"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center py-5 text-muted">
+            <i class="fa-solid fa-house-chimney-crack fs-1 opacity-25 mb-3 d-block"></i>
+            <h6>Chưa có bất động sản nào trong kho</h6>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================= 2. GRID VIEW ================= -->
+<div class="row g-4" id="listingsContainer" style="display: none;">
   {% for item in listings %}
-  <div class="col-md-6 col-lg-4">
-    <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+  <div class="col-md-6 col-lg-4 listing-card-item" 
+       id="card-{{ item.id }}"
+       data-id="{{ item.id }}"
+       data-title="{{ item.title|lower }}" 
+       data-location="{{ item.location|lower }}"
+       data-status="{{ item.status or 'available' }}">
+    <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden position-relative">
+      <div class="position-absolute top-0 start-0 m-2" style="z-index: 5;">
+        <div class="bg-body bg-opacity-90 rounded-circle p-2 shadow-sm d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+          <input class="form-check-input listing-checkbox m-0" 
+                 type="checkbox" 
+                 value="{{ item.id }}" 
+                 id="check-card-{{ item.id }}"
+                 onchange="handleRowCheckboxChange({{ item.id }}, this.checked)">
+        </div>
+      </div>
+
       {% if item.image_url %}
       <img src="{{ item.image_url }}" class="card-img-top object-fit-cover" style="height: 180px;" alt="{{ item.title }}" onerror="this.src='https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&auto=format&fit=crop&q=80'">
       {% else %}
@@ -41,15 +237,29 @@
       </div>
     </div>
   </div>
-  {% else %}
-  <div class="col-12">
-    <div class="card border-0 shadow-sm p-5 text-center text-muted rounded-4">
-      <i class="fa-solid fa-house-chimney-crack fs-1 opacity-25 mb-3"></i>
-      <h5>Chưa có bất động sản nào trong kho</h5>
-      <p class="small">Bấm "Thêm BĐS Mới" để lưu tin bất động sản đầu tiên của bạn.</p>
+  {% endfor %}
+</div>
+
+<!-- Modal: Xóa Hàng Loạt -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom bg-danger bg-opacity-10 text-danger">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-triangle-exclamation me-2"></i>Xác Nhận Xóa Hàng Loạt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="mb-3">Bạn có chắc chắn muốn xóa vĩnh viễn <strong class="text-danger" id="bulkDeleteCountText">0</strong> bất động sản đã chọn?</p>
+        <div class="alert alert-warning small mb-0">Thao tác này sẽ xóa dữ liệu khỏi kho vĩnh viễn.</div>
+      </div>
+      <div class="modal-footer border-top">
+        <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Hủy bỏ</button>
+        <button type="button" class="btn btn-danger rounded-pill fw-bold" id="confirmBulkDeleteBtn" onclick="executeBulkDelete()">
+          <i class="fa-solid fa-trash-can me-1"></i> Đồng Ý Xóa
+        </button>
+      </div>
     </div>
   </div>
-  {% endfor %}
 </div>
 
 <!-- Modal Thêm BĐS -->
@@ -67,13 +277,22 @@
             <input type="text" name="title" class="form-control" placeholder="Bán nhà mặt phố Cầu Giấy, 5 tầng thang máy..." required>
           </div>
           <div class="row">
-            <div class="col-md-6 mb-3">
+            <div class="col-md-4 mb-3">
               <label class="form-label fw-semibold">Giá bán (Tỷ VNĐ):</label>
               <input type="number" step="0.1" name="price" class="form-control" placeholder="Ví dụ: 8.5" required>
             </div>
-            <div class="col-md-6 mb-3">
+            <div class="col-md-4 mb-3">
               <label class="form-label fw-semibold">Diện tích (m²):</label>
               <input type="number" step="0.5" name="area" class="form-control" placeholder="Ví dụ: 65" required>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label fw-semibold">Trạng thái:</label>
+              <select name="status" class="form-select">
+                <option value="available" selected>🟢 Đang bán</option>
+                <option value="reserved">🟡 Đã đặt cọc</option>
+                <option value="sold">🟣 Đã chốt bán</option>
+                <option value="paused">🔴 Tạm ngưng</option>
+              </select>
             </div>
           </div>
           <div class="mb-3">
@@ -97,4 +316,202 @@
     </div>
   </div>
 </div>
+
+<style>
+  .listing-row.selected-row {
+    background-color: rgba(37, 99, 235, 0.08) !important;
+  }
+</style>
+
+<script>
+  let selectedIds = new Set();
+
+  function switchView(mode) {
+    const tableView = document.getElementById('tableViewContainer');
+    const gridView = document.getElementById('listingsContainer');
+    const btnTable = document.getElementById('btnTableView');
+    const btnGrid = document.getElementById('btnGridView');
+
+    if (mode === 'grid') {
+      tableView.style.display = 'none';
+      gridView.style.display = 'flex';
+      btnTable.classList.remove('active');
+      btnGrid.classList.add('active');
+    } else {
+      tableView.style.display = 'block';
+      gridView.style.display = 'none';
+      btnTable.classList.add('active');
+      btnGrid.classList.remove('active');
+    }
+  }
+
+  function handleRowCheckboxChange(id, isChecked) {
+    id = Number(id);
+    if (isChecked) selectedIds.add(id);
+    else selectedIds.delete(id);
+    syncCheckboxElements(id, isChecked);
+    updateSelectionUI();
+  }
+
+  function syncCheckboxElements(id, isChecked) {
+    const tCb = document.getElementById('check-table-' + id);
+    const cCb = document.getElementById('check-card-' + id);
+    const rowEl = document.getElementById('row-' + id);
+
+    if (tCb) tCb.checked = isChecked;
+    if (cCb) cCb.checked = isChecked;
+    if (rowEl) {
+      if (isChecked) rowEl.classList.add('selected-row');
+      else rowEl.classList.remove('selected-row');
+    }
+  }
+
+  function toggleSelectAll(isChecked) {
+    getVisibleElements().forEach(el => {
+      const id = Number(el.getAttribute('data-id'));
+      if (id) {
+        if (isChecked) selectedIds.add(id);
+        else selectedIds.delete(id);
+        syncCheckboxElements(id, isChecked);
+      }
+    });
+    updateSelectionUI();
+  }
+
+  function selectAllVisible() {
+    toggleSelectAll(true);
+  }
+
+  function deselectAll() {
+    selectedIds.clear();
+    document.querySelectorAll('.listing-checkbox').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.listing-row').forEach(r => r.classList.remove('selected-row'));
+    updateSelectionUI();
+  }
+
+  function getVisibleElements() {
+    return Array.from(document.querySelectorAll('.listing-row')).filter(el => el.style.display !== 'none');
+  }
+
+  function updateSelectionUI() {
+    const count = selectedIds.size;
+    const bulkBar = document.getElementById('bulkActionBar');
+    const badge = document.getElementById('selectedCountBadge');
+    const masterCb = document.getElementById('masterCheckbox');
+    const bulkBarCb = document.getElementById('bulkBarSelectAll');
+
+    if (badge) badge.textContent = count;
+    if (count > 0) bulkBar.style.display = 'block';
+    else bulkBar.style.display = 'none';
+
+    const visibleEls = getVisibleElements();
+    let selectedVisible = 0;
+    visibleEls.forEach(el => {
+      if (selectedIds.has(Number(el.getAttribute('data-id')))) selectedVisible++;
+    });
+
+    const isAll = visibleEls.length > 0 && selectedVisible === visibleEls.length;
+    const isSome = selectedVisible > 0 && selectedVisible < visibleEls.length;
+
+    if (masterCb) {
+      masterCb.checked = isAll;
+      masterCb.indeterminate = isSome;
+    }
+    if (bulkBarCb) {
+      bulkBarCb.checked = isAll;
+      bulkBarCb.indeterminate = isSome;
+    }
+  }
+
+  function filterListings() {
+    const q = document.getElementById('listingSearchInput').value.toLowerCase().trim();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const rows = document.querySelectorAll('.listing-row');
+    const cards = document.querySelectorAll('.listing-card-item');
+
+    let visibleCount = 0;
+    function checkItem(el) {
+      const title = el.getAttribute('data-title') || '';
+      const location = el.getAttribute('data-location') || '';
+      const status = el.getAttribute('data-status') || 'available';
+      const matchesSearch = !q || title.includes(q) || location.includes(q);
+      const matchesStatus = (statusFilter === 'all' || status === statusFilter);
+      return matchesSearch && matchesStatus;
+    }
+
+    rows.forEach(el => {
+      const v = checkItem(el);
+      el.style.display = v ? '' : 'none';
+      if (v) visibleCount++;
+    });
+    cards.forEach(el => {
+      el.style.display = checkItem(el) ? 'block' : 'none';
+    });
+
+    document.getElementById('visibleListingsCount').textContent = visibleCount;
+    updateSelectionUI();
+  }
+
+  function openBulkDeleteModal() {
+    if (selectedIds.size === 0) return alert('Vui lòng chọn ít nhất một bất động sản!');
+    document.getElementById('bulkDeleteCountText').textContent = selectedIds.size;
+    new bootstrap.Modal(document.getElementById('bulkDeleteModal')).show();
+  }
+
+  async function executeBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      const res = await fetch('/listings/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.reload();
+      } else {
+        alert(data.message || 'Lỗi khi xóa');
+      }
+    } catch (e) {
+      alert('Lỗi kết nối: ' + e.message);
+    }
+  }
+
+  async function bulkUpdateStatus(newStatus) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return alert('Vui lòng chọn ít nhất một bất động sản!');
+    try {
+      const res = await fetch('/listings/bulk-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.reload();
+      } else {
+        alert(data.message || 'Lỗi cập nhật');
+      }
+    } catch (e) {
+      alert('Lỗi kết nối: ' + e.message);
+    }
+  }
+
+  async function singleUpdateStatus(id, newStatus) {
+    try {
+      const res = await fetch('/listings/bulk-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id], status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+</script>
 {% endblock %}

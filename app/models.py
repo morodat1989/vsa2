@@ -12,6 +12,7 @@ class Listing(Base):
     description = Column(Text, nullable=True, default="")
     image_url = Column(String(500), nullable=True, default="")
     contact = Column(String(100), nullable=True, default="")
+    status = Column(String(50), default="available")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class FacebookAccount(Base):

@@ -1,5 +1,6 @@
+import json
 from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -30,6 +31,7 @@ def create_listing(
     location: str = Form(...),
     description: str = Form(""),
     image_url: str = Form(""),
+    status: str = Form("available"),
     db: Session = Depends(get_db)
 ):
     new_listing = Listing(
@@ -38,7 +40,8 @@ def create_listing(
         area=area,
         location=location,
         description=description,
-        image_url=image_url
+        image_url=image_url,
+        status=status
     )
     db.add(new_listing)
     db.commit()
@@ -51,3 +54,55 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db)):
         db.delete(item)
         db.commit()
     return RedirectResponse(url="/listings", status_code=303)
+
+@router.post("/bulk-delete")
+async def bulk_delete_listings(request: Request, db: Session = Depends(get_db)):
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            data = await request.json()
+            ids = data.get("ids", [])
+        else:
+            form = await request.form()
+            raw_ids = form.get("ids", "[]")
+            try:
+                ids = json.loads(raw_ids)
+            except Exception:
+                ids = [x.strip() for x in str(raw_ids).split(",") if x.strip()]
+        
+        int_ids = [int(i) for i in ids if str(i).isdigit() or isinstance(i, int)]
+        if int_ids:
+            db.query(Listing).filter(Listing.id.in_(int_ids)).delete(synchronize_session=False)
+            db.commit()
+            return JSONResponse({"success": True, "count": len(int_ids), "message": f"Đã xóa {len(int_ids)} BĐS thành công!"})
+        return JSONResponse({"success": False, "message": "Chưa chọn bất động sản nào để xóa"}, status_code=400)
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
+@router.post("/bulk-status")
+async def bulk_status_listings(request: Request, db: Session = Depends(get_db)):
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            data = await request.json()
+            ids = data.get("ids", [])
+            status = data.get("status", "available")
+        else:
+            form = await request.form()
+            raw_ids = form.get("ids", "[]")
+            status = form.get("status", "available")
+            try:
+                ids = json.loads(raw_ids)
+            except Exception:
+                ids = [x.strip() for x in str(raw_ids).split(",") if x.strip()]
+        
+        int_ids = [int(i) for i in ids if str(i).isdigit() or isinstance(i, int)]
+        if int_ids:
+            db.query(Listing).filter(Listing.id.in_(int_ids)).update({"status": status}, synchronize_session=False)
+            db.commit()
+            return JSONResponse({"success": True, "count": len(int_ids), "status": status, "message": f"Đã cập nhật trạng thái {len(int_ids)} BĐS!"})
+        return JSONResponse({"success": False, "message": "Chưa chọn bất động sản nào để cập nhật"}, status_code=400)
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)

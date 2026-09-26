@@ -262,6 +262,28 @@ export const db = {
     writeDb(store);
     return true;
   },
+  deleteListings: (ids) => {
+    const store = readDb();
+    const idSet = new Set(ids.map(Number));
+    const initialCount = store.listings.length;
+    store.listings = store.listings.filter(l => !idSet.has(Number(l.id)));
+    writeDb(store);
+    return initialCount - store.listings.length;
+  },
+  updateListingsStatus: (ids, status) => {
+    const store = readDb();
+    const idSet = new Set(ids.map(Number));
+    let updatedCount = 0;
+    store.listings = store.listings.map(item => {
+      if (idSet.has(Number(item.id))) {
+        updatedCount++;
+        return { ...item, status: status || 'available' };
+      }
+      return item;
+    });
+    writeDb(store);
+    return updatedCount;
+  },
 
   // Accounts
   getAccounts: () => readDb().accounts,
