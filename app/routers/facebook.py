@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FacebookAccount, FacebookGroup, PostLog, Listing
-from app.services.ai_service import generate_ai_post, generate_marketplace_data, generate_spintax_variation
+from app.services.ai_service import generate_ai_post, generate_marketplace_data, generate_spintax_variation, build_default_listing_content
 from app.services.profile_scanner import (
     scan_all_profiles_detail, 
     set_active_profile_name, 
@@ -320,18 +320,29 @@ def view_logs(request: Request, db: Session = Depends(get_db)):
 
 # AI Writing & Posting
 @router.get("/ai-write/{listing_id}")
-def ai_write(listing_id: int, request: Request, db: Session = Depends(get_db)):
+def ai_write(listing_id: int, request: Request, regen: Optional[int] = 0, db: Session = Depends(get_db)):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         return RedirectResponse(url="/listings", status_code=303)
 
-    ai_content = generate_ai_post(
-        listing_title=listing.title,
-        price=listing.price,
-        area=listing.area,
-        location=listing.location,
-        description=listing.description or ""
-    )
+    # Bước 1 (Vào xem tin): Tuyệt đối KHÔNG gọi Gemini để trang tải tức thì (0ms), không lag, không tốn quota.
+    # Bước 2: Chỉ khi người dùng bấm "Sinh Lại AI" (regen=1 hoặc gọi API), hệ thống mới kích hoạt Gemini.
+    if regen == 1:
+        ai_content = generate_ai_post(
+            listing_title=listing.title,
+            price=listing.price,
+            area=listing.area,
+            location=listing.location,
+            description=listing.description or ""
+        )
+    else:
+        ai_content = build_default_listing_content(
+            listing_title=listing.title,
+            price=listing.price,
+            area=listing.area,
+            location=listing.location,
+            description=listing.description or ""
+        )
 
     marketplace_data = generate_marketplace_data(
         listing_title=listing.title,
@@ -363,6 +374,22 @@ def ai_write(listing_id: int, request: Request, db: Session = Depends(get_db)):
             "listing_logs": listing_logs
         }
     )
+
+@router.post("/ai-generate-ajax/{listing_id}")
+async def ai_generate_ajax(listing_id: int, db: Session = Depends(get_db)):
+    """API gọi riêng cho Bước 2 khi bấm nút 'Sinh Lại AI' mà không cần tải lại toàn bộ trang"""
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        return JSONResponse({"success": False, "message": "Không tìm thấy BĐS"}, status_code=404)
+
+    content = generate_ai_post(
+        listing_title=listing.title,
+        price=listing.price,
+        area=listing.area,
+        location=listing.location,
+        description=listing.description or ""
+    )
+    return JSONResponse({"success": True, "content": content})
 
 @router.post("/publish")
 def publish_post(

@@ -63,9 +63,9 @@
             <h6 class="fw-bold mb-0 text-dark">
               <i class="fa-solid fa-pen-nib text-primary me-2"></i>Nội Dung Bài Đăng (AI Tạo):
             </h6>
-            <a href="/facebook/ai-write/{{ listing.id }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" title="Tạo lại nội dung mới bằng Gemini">
-              <i class="fa-solid fa-arrows-rotate me-1"></i> Sinh Lại AI
-            </a>
+            <button type="button" id="btnRegenAi" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-xs" onclick="triggerRegenerateAi({{ listing.id }})" title="Gọi Gemini để sinh lại nội dung mới">
+              <i class="fa-solid fa-arrows-rotate me-1" id="iconRegenAi"></i> <span id="textRegenAi">Sinh Lại AI</span>
+            </button>
           </div>
 
           <div class="mb-3">
@@ -669,6 +669,43 @@
 
 <script>
   const CURRENT_LISTING_ID = {{ listing.id }};
+
+  // Bước 2: Kích hoạt gọi Gemini khi người dùng chủ động bấm "Sinh Lại AI"
+  async function triggerRegenerateAi(listingId) {
+    const btn = document.getElementById('btnRegenAi');
+    const icon = document.getElementById('iconRegenAi');
+    const text = document.getElementById('textRegenAi');
+    const textarea = document.getElementById('groupPostContent');
+
+    if (!btn || !textarea) return;
+
+    btn.disabled = true;
+    if (icon) icon.className = 'fa-solid fa-spinner fa-spin me-1';
+    if (text) text.textContent = 'Gemini đang viết...';
+
+    try {
+      const resp = await fetch('/facebook/ai-generate-ajax/' + listingId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await resp.json();
+      if (data && data.success && data.content) {
+        textarea.value = data.content;
+        textarea.classList.add('border-primary');
+        setTimeout(() => textarea.classList.remove('border-primary'), 1200);
+      } else {
+        // Fallback reload query param if AJAX fails
+        window.location.href = '/facebook/ai-write/' + listingId + '?regen=1';
+      }
+    } catch (err) {
+      console.error(err);
+      window.location.href = '/facebook/ai-write/' + listingId + '?regen=1';
+    } finally {
+      btn.disabled = false;
+      if (icon) icon.className = 'fa-solid fa-arrows-rotate me-1';
+      if (text) text.textContent = 'Sinh Lại AI';
+    }
+  }
 
   // Cuộn nhanh hộp danh sách lên đầu hoặc xuống đáy
   function scrollInlineBox(direction) {

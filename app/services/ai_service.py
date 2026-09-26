@@ -2,6 +2,23 @@ import os
 import random
 from google import genai
 
+def build_default_listing_content(listing_title: str, price: float, area: float, location: str, description: str) -> str:
+    """
+    Tạo nội dung mặc định hiển thị tức thì (0ms, không lag, không gọi Gemini ở Bước 1).
+    Chuẩn mẫu môi giới thực chiến, ngắn gọn, có icon và số SĐT/Zalo 0559 431 814.
+    """
+    price_display = f"{price:g} tỷ" if price >= 1.0 else f"{int(price * 1000)} triệu"
+    if price == 0:
+        price_display = "Thỏa thuận"
+
+    return f"""🏠 {listing_title.upper()}
+📍 Vị trí: {location}
+💰 Giá: {price_display} (có thoả thuận)
+✨ Diện tích: {area} m²
+👉 Mô tả & Công năng: {description if description else 'Vị trí đẹp, dân trí cao, giao thông thuận tiện.'}
+📕 Pháp lý: Sổ đỏ chính chủ
+☎️ SĐT/Zalo: 0559 431 814"""
+
 def generate_ai_post(listing_title: str, price: float, area: float, location: str, description: str, tone: str = "chuyen_nghiep"):
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
