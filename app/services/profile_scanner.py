@@ -782,25 +782,40 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
             // Cách 1: Tìm GroupInlineComposer của Facebook
             const composerPagelet = document.querySelector('div[data-pagelet="GroupInlineComposer"]');
             if (composerPagelet) {
-                // Ưu tiên 1.1: Hộp văn bản giả lập "Bạn viết gì đi..."
-                const mainBtn = composerPagelet.querySelector('div[role="button"][tabindex="0"], div[role="button"]:not([aria-label*="Ảnh"]):not([aria-label*="Photo"]):not([aria-label*="video"])');
-                if (mainBtn && !isForbiddenElement(mainBtn)) {
-                    triggerEl = mainBtn;
+                // Ưu tiên 1.1: Tìm phần tử mang chữ "Bạn viết gì đi..."
+                const allComposerEls = Array.from(composerPagelet.querySelectorAll('*'));
+                for (const el of allComposerEls) {
+                    const txt = (el.innerText || el.textContent || el.getAttribute('aria-label') || '').toLowerCase().trim();
+                    if (txt.includes('bạn viết gì đi') || txt.includes('write something') || txt.includes('tạo bài viết')) {
+                        const btn = el.closest('div[role="button"]') || el;
+                        if (!isForbiddenElement(btn)) {
+                            triggerEl = btn;
+                            break;
+                        }
+                    }
+                }
+
+                // Ưu tiên 1.2: Hộp văn bản giả lập chính
+                if (!triggerEl) {
+                    const mainBtn = composerPagelet.querySelector('div[role="button"][tabindex="0"], div[role="button"]:not([aria-label*="Ảnh"]):not([aria-label*="Photo"]):not([aria-label*="video"])');
+                    if (mainBtn && !isForbiddenElement(mainBtn)) {
+                        triggerEl = mainBtn;
+                    }
                 }
                 
-                // Ưu tiên 1.2: Nếu là nhóm Mua Bán (Buy/Sell) có nút "Thảo luận"
+                // Ưu tiên 1.3: Nếu là nhóm Mua Bán (Buy/Sell) có nút "Thảo luận"
                 if (!triggerEl) {
                     const buttons = Array.from(composerPagelet.querySelectorAll('div[role="button"], span, div[tabindex="0"]'));
                     for (const b of buttons) {
                         const t = (b.innerText || b.getAttribute('aria-label') || '').toLowerCase().trim();
-                        if ((t.includes('thảo luận') || t.includes('discussion') || t.includes('bạn viết gì đi')) && !isForbiddenElement(b)) {
+                        if ((t.includes('thảo luận') || t.includes('discussion')) && !isForbiddenElement(b)) {
                             triggerEl = b;
                             break;
                         }
                     }
                 }
 
-                // Ưu tiên 1.3: Nhấp vào nút "Ảnh/video" trong GroupInlineComposer (Nút này 100% kích hoạt mở dialog tạo bài)
+                // Ưu tiên 1.4: Nhấp vào nút "Ảnh/video" trong GroupInlineComposer nếu có
                 if (!triggerEl) {
                     const mediaBtn = composerPagelet.querySelector('div[aria-label*="Ảnh"], div[aria-label*="Photo"], div[aria-label*="video"]');
                     if (mediaBtn && !isForbiddenElement(mediaBtn)) {
@@ -814,7 +829,7 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
                 const promptKeywords = [
                     "bạn viết gì đi", "write something", "tạo bài viết", 
                     "tạo bài viết công khai", "create a public post", "create post", 
-                    "viết gì đó", "bạn đang nghĩ gì", "what's on your mind"
+                    "viết gì đó", "bạn đang nghĩ gì", "on your mind"
                 ];
                 const feedArea = document.querySelector('div[role="feed"], div[role="main"]') || document.body;
                 const buttons = Array.from(feedArea.querySelectorAll('div[role="button"], div[tabindex="0"]'));
@@ -898,7 +913,7 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
             'div[aria-label*="Create a post"]',
             'div[aria-label*="Create post"]',
             'div[aria-label*="Bạn đang nghĩ gì"]',
-            'div[aria-label*="What\'s on your mind"]',
+            'div[aria-label*="on your mind"]',
             'div[data-placeholder*="Tạo bài viết"]',
             'div[data-placeholder*="Create"]',
             'p[data-placeholder*="Tạo bài viết"]'
