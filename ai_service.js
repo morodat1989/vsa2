@@ -13,42 +13,67 @@ export async function generatePostContent(listing, style = 'engaging', customIns
 
   const selectedStyle = stylePrompts[style] || stylePrompts.engaging;
 
-  const prompt = `Bạn là một chuyên gia marketing bất động sản và copywriting mạng xã hội hàng đầu tại Việt Nam.
-Hãy viết một bài đăng Facebook bán bất động sản cực kỳ cuốn hút, chuẩn SEO Facebook, có bố cục rõ ràng với các biểu tượng cảm xúc (emoji) phù hợp, kêu gọi hành động (CTA) mạnh mẽ và hashtag liên quan.
+  const prompt = `Bạn là chuyên viên môi giới bất động sản thực chiến tại Việt Nam.
+Hãy viết một bài đăng Facebook bán/cho thuê bất động sản theo đúng PHONG CÁCH MÔI GIỚI THỰC CHIẾN: NGẮN GỌN, SÚC TÍCH, DÙNG ICON ĐẦU DÒNG (*, 👉, 📍, 💰, ✨, 🏠, 📕, ☎️) giống hệt các mẫu thực tế sau:
+
+Mẫu 1:
+Cho thuê nguyên căn tại Văn Cao siêu xịn 
+👉 Diện tích : 80 m2 x 4.5 tầng 
+👉 Cấu trúc : 5 ngủ khép kín 
+👉 Full đồ siêu đẹp 
+👉 Thuận lợi đi lại 
+👉 Khách chỉ cần xách vali về để ở 
+💵 Giá cho thuê : 25 tr (thoả thuận nhẹ)
+☎️ SĐT/Zalo: 0559 431 814
+
+Mẫu 2:
+Cho thuê tầng 1 + 2 mặt đường Chi Lăng thuộc Hoàng Huy Reverside
+*Giá : 16tr (thoả thuận)
+*Diện tích : 85m2, mặt tiền 6m, vỉa hè 3m
+*Nhà thuộc dự án Hoàng Huy Reverside mặt đường Chi Lăng
+*Công năng : cho thuê tầng 1 + 2
+*Pháp lý : sổ đỏ chính chủ
+*SĐT/Zalo: 0559 431 814
 
 THÔNG TIN BẤT ĐỘNG SẢN:
 - Tiêu đề: ${listing.title}
 - Vị trí/Địa chỉ: ${listing.address}
-- Giá bán: ${listing.price ? listing.price + ' Tỷ' : 'Thỏa thuận'}
+- Giá bán/thuê: ${listing.price ? listing.price + ' Tỷ' : 'Thỏa thuận'}
 - Diện tích: ${listing.area ? listing.area + ' m²' : 'Chưa rõ'}
-- Kết cấu/Phòng: ${listing.bedrooms ? listing.bedrooms + ' Phòng ngủ' : ''} ${listing.bathrooms ? ', ' + listing.bathrooms + ' WC' : ''}
-- Hướng: ${listing.direction || 'Đông Nam'}
-- Pháp lý: ${listing.legal || 'Sổ hồng riêng, công chứng ngay'}
-- Nội thất: ${listing.interior || 'Đầy đủ'}
-- Người liên hệ: ${listing.contact_name || 'Chính chủ'}
-- Số điện thoại/Zalo: ${listing.contact_phone || 'Liên hệ ngay'}
+- Kết cấu/Công năng: ${listing.bedrooms ? listing.bedrooms + ' Phòng ngủ' : ''} ${listing.bathrooms ? ', ' + listing.bathrooms + ' WC' : ''}
+- Pháp lý: ${listing.legal || 'Sổ hồng riêng chính chủ'}
 - Mô tả chi tiết: ${listing.description || ''}
 
-YÊU CẦU NỘI DUNG:
-- ${selectedStyle}
-${customInstructions ? `- Yêu cầu thêm từ người dùng: ${customInstructions}` : ''}
-- Hãy viết trực tiếp nội dung bài đăng Facebook (không cần lời chào đầu hay giải thích của AI).
-- Bao gồm tiêu đề giật tít, các điểm nhấn (bullet points), thông số kỹ thuật, giá cả, thông tin liên hệ và các hashtag thị trường BĐS.`;
+YÊU CẦU BẮT BUỘC:
+1. BỐ CỤC NGẮN GỌN, SÚC TÍCH: Tuyệt đối không viết văn dài dòng, không lan man miêu tả chung chung.
+2. DÙNG CÁC ĐẦU DÒNG CÓ ICON (👉 hoặc * hoặc 📍, ✨, 🏠, 💰, 📕, ☎️) cho từng thông số.
+3. BẮT BUỘC DÒNG LIÊN HỆ CUỐI BÀI LÀ:
+☎️ SĐT/Zalo: 0559 431 814
+4. Trả về trực tiếp nội dung bài đăng Facebook (không thêm lời chào hay giải thích).`;
 
   if (apiKey) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const model = settings.gemini_model || 'gemini-3.8-flash';
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-      });
+    const candidateModels = [
+      settings.gemini_model || 'gemini-flash-latest',
+      'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
+      'gemini-3.8-flash'
+    ];
+    const uniqueModels = [...new Set(candidateModels)];
+    for (const m of uniqueModels) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: m,
+          contents: prompt,
+        });
 
-      if (response && response.text) {
-        return response.text.trim();
+        if (response && response.text) {
+          return response.text.trim();
+        }
+      } catch (err) {
+        // Thử model dự phòng tiếp theo nếu gặp lỗi 503 hoặc quá tải
+        continue;
       }
-    } catch (err) {
-      console.warn("Gemini API call failed or quota exceeded, using smart fallback template:", err.message);
     }
   }
 
