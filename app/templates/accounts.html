@@ -86,7 +86,14 @@
                 <i class="fa-solid {{ 'fa-user-check' if prof.has_fb_login else 'fa-user-slash' }}"></i>
               </div>
               <div>
-                <h6 class="fw-bold mb-0 text-dark">{{ prof.name }}</h6>
+                <h6 class="fw-bold mb-0 text-dark">
+                  {% if prof.user_name %}
+                    {{ prof.user_name }}
+                    <span class="badge bg-primary-subtle text-primary ms-1 font-monospace">{{ prof.name }}</span>
+                  {% else %}
+                    {{ prof.name }}
+                  {% endif %}
+                </h6>
                 <small class="text-muted font-monospace"><i class="fa-regular fa-folder me-1"></i>profiles\{{ prof.name }}</small>
               </div>
             </div>

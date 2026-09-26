@@ -17,20 +17,23 @@ def sync_profiles_to_db(db: Session):
     """Đồng bộ tự động các Profile Chromium vào bảng FacebookAccount"""
     scan_result = scan_all_profiles_detail()
     for prof in scan_result["profiles"]:
-        uid_val = prof["c_user"] or f"profile_{prof['name']}"
+        uid_val = prof["c_user"] if prof["c_user"] and prof["c_user"] != "Live Session" else f"fb_{prof['name']}"
+        account_name = f"{prof['user_name']} ({prof['name']})" if prof.get("user_name") else f"Profile: {prof['name']}"
+
         existing = db.query(FacebookAccount).filter(
-            (FacebookAccount.name == prof["name"]) | (FacebookAccount.uid == uid_val)
+            (FacebookAccount.name.like(f"%{prof['name']}%")) | (FacebookAccount.uid == uid_val)
         ).first()
 
         status_str = "Live" if prof["has_fb_login"] else "Chưa đăng nhập FB"
         if existing:
             existing.status = status_str
+            existing.name = account_name
             if prof["c_user"]:
                 existing.uid = prof["c_user"]
             existing.last_checked = datetime.datetime.utcnow()
         else:
             new_acc = FacebookAccount(
-                name=f"Profile: {prof['name']}",
+                name=account_name,
                 uid=uid_val,
                 status=status_str,
                 last_checked=datetime.datetime.utcnow()
