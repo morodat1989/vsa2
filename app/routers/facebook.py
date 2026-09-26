@@ -2,13 +2,13 @@ import os
 import subprocess
 import datetime
 from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FacebookAccount, FacebookGroup, PostLog, Listing
 from app.services.ai_service import generate_ai_post
-from app.services.profile_scanner import scan_all_profiles_detail, set_active_profile_name
+from app.services.profile_scanner import scan_all_profiles_detail, set_active_profile_name, scan_facebook_groups_pacing
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -218,6 +218,56 @@ def delete_group(group_id: int, db: Session = Depends(get_db)):
         db.delete(grp)
         db.commit()
     return RedirectResponse(url="/facebook/groups", status_code=303)
+
+@router.post("/groups/scan")
+async def scan_groups_api(request: Request, db: Session = Depends(get_db)):
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            data = await request.json()
+            limit = int(data.get("limit", 5))
+            delay = float(data.get("delay", 3.0))
+        else:
+            form = await request.form()
+            limit = int(form.get("limit", 5))
+            delay = float(form.get("delay", 3.0))
+            
+        result = scan_facebook_groups_pacing(limit=limit, delay_seconds=delay)
+        
+        saved_count = 0
+        new_count = 0
+        for g in result.get("groups", []):
+            gid = str(g["group_id"]).strip()
+            existing = db.query(FacebookGroup).filter(FacebookGroup.group_id == gid).first()
+            if existing:
+                existing.name = g["name"]
+                if g.get("members_count"):
+                    existing.members_count = g["members_count"]
+                saved_count += 1
+            else:
+                new_grp = FacebookGroup(
+                    name=g["name"],
+                    group_id=gid,
+                    members_count=g.get("members_count", 50000),
+                    privacy=g.get("privacy", "PUBLIC")
+                )
+                db.add(new_grp)
+                new_count += 1
+                saved_count += 1
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "count": len(result.get("groups", [])),
+            "new_count": new_count,
+            "saved_count": saved_count,
+            "logs": result.get("logs", []),
+            "groups": result.get("groups", [])
+        })
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
 
 # Logs
 @router.get("/logs")

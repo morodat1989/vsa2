@@ -9,12 +9,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.database import engine, Base, get_db
+from app.database import engine, Base, get_db, run_migrations
 from app.models import Listing, FacebookAccount, FacebookGroup, PostLog, Setting
 from app.routers import listings, facebook, settings
 
-# Tạo bảng database nếu chưa có
+# Tạo bảng database nếu chưa có và tự động chạy migration
 Base.metadata.create_all(bind=engine)
+run_migrations()
 
 # Khởi tạo dữ liệu mẫu nếu database đang trống
 def init_sample_data():

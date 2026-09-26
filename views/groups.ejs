@@ -1,11 +1,11 @@
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
   <div>
-    <h4 class="fw-bold mb-1">Danh Sách Nhóm Facebook</h4>
+    <h4 class="fw-bold mb-1"><i class="fa-solid fa-users-rectangle text-primary me-2"></i>Quản Lý Nhóm Facebook</h4>
     <p class="text-muted small mb-0">Quản lý các hội nhóm bất động sản đã tham gia để phân phối bài đăng</p>
   </div>
   <div class="d-flex gap-2">
-    <button class="btn btn-outline-primary rounded-pill px-3 shadow-sm" onclick="scanCurrentAccountGroups()">
-      <i class="bi bi-arrow-repeat me-1"></i> Quét Danh Sách Nhóm
+    <button class="btn btn-outline-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#scanGroupModal">
+      <i class="bi bi-search me-1"></i> Quét Nhóm Tự Động
     </button>
     <button class="btn btn-gradient-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal">
       <i class="bi bi-plus-circle me-1"></i> Thêm Nhóm Mới
@@ -117,12 +117,121 @@
             <tr>
               <td colspan="6" class="text-center py-5 text-muted">
                 <i class="fa-solid fa-users-slash fs-1 text-secondary d-block mb-3"></i>
-                Chưa có nhóm nào. Nhấn "Quét Danh Sách Nhóm" hoặc "Thêm Nhóm Mới" để bắt đầu!
+                Chưa có nhóm nào. Bấm <b>"Quét Nhóm Tự Động"</b> để bắt đầu!
               </td>
             </tr>
           <% } %>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: QUÉT NHÓM TỰ ĐỘNG ================= -->
+<div class="modal fade" id="scanGroupModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-bottom bg-primary bg-opacity-10">
+        <h5 class="modal-title fw-bold text-primary">
+          <i class="bi bi-search me-2"></i>Quét Nhóm Facebook Tự Động
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" id="closeScanModalBtn"></button>
+      </div>
+
+      <div class="modal-body p-4">
+        <!-- Chế độ chọn quét -->
+        <div class="mb-4">
+          <label class="form-label fw-bold mb-2 text-dark">
+            <i class="bi bi-check2-square text-primary me-1"></i> 1. Chọn chế độ quét nhóm:
+          </label>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <div class="card h-100 border p-3 cursor-pointer option-card active-option" id="cardOption5" onclick="selectScanOption(5)">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="scanMode" id="mode5" value="5" checked>
+                  <label class="form-check-label fw-bold" for="mode5">
+                    Quét nhanh 5 nhóm
+                    <span class="badge bg-success-subtle text-success ms-1 small">Khuyên dùng</span>
+                  </label>
+                  <div class="text-muted small mt-1">
+                    Lấy 5 nhóm đầu tiên, hoàn tất nhanh trong ~15s, an toàn tối đa cho nick mới.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="card h-100 border p-3 cursor-pointer option-card" id="cardOptionAll" onclick="selectScanOption(0)">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="scanMode" id="modeAll" value="0">
+                  <label class="form-check-label fw-bold" for="modeAll">
+                    Quét tất cả nhóm
+                    <span class="badge bg-primary-subtle text-primary ms-1 small">Toàn bộ</span>
+                  </label>
+                  <div class="text-muted small mt-1">
+                    Duyệt qua tất cả các nhóm đã tham gia với cơ chế nghỉ ngắt quãng.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cài đặt nghỉ ngơi chống checkpoint -->
+        <div class="mb-4 p-3 rounded-3 bg-light border border-warning-subtle">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <label class="form-label fw-bold mb-0 text-dark">
+              <i class="bi bi-shield-check text-warning me-1"></i> 2. Cơ chế nghỉ giữa chừng (Chống Checkpoint / Chết nick):
+            </label>
+            <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill me-1"></i>Bảo vệ FB</span>
+          </div>
+          
+          <div class="row g-2 align-items-center mt-1">
+            <div class="col-md-5">
+              <select id="scanDelaySelect" class="form-select">
+                <option value="2.0">Nghỉ 2 giây / nhóm (Nhanh)</option>
+                <option value="3.0" selected>Nghỉ 3 giây / nhóm (Khuyên dùng - Cân bằng)</option>
+                <option value="5.0">Nghỉ 5 giây / nhóm (Cực kỳ an toàn - Nick mới)</option>
+              </select>
+            </div>
+            <div class="col-md-7">
+              <span class="text-muted small">
+                <i class="bi bi-info-circle text-info me-1"></i>Hệ thống tự động thêm độ lệch ngẫu nhiên để mô phỏng hành vi người dùng thật, tránh Facebook quét spam.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hộp tiến trình và Log trực tiếp -->
+        <div id="scanProgressArea" style="display: none;">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-bold small text-primary" id="scanStatusTitle">Đang chuẩn bị quét...</span>
+            <span class="badge bg-primary" id="scanProgressPercent">0%</span>
+          </div>
+
+          <div class="progress mb-3" style="height: 10px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" id="scanProgressBar" role="progressbar" style="width: 0%"></div>
+          </div>
+
+          <!-- Console Terminal Log -->
+          <div class="bg-dark text-light p-3 rounded-3 font-monospace small mb-3" style="max-height: 180px; overflow-y: auto;" id="scanTerminalLog">
+            <div class="text-secondary">[Sẵn sàng] Bấm "Bắt Đầu Quét & Lưu" để tiến hành...</div>
+          </div>
+        </div>
+
+        <!-- Kết quả sau khi quét -->
+        <div id="scanResultAlert" class="alert alert-success d-none mb-0" role="alert">
+          <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i>
+          <span id="scanResultText">Quét và lưu nhóm thành công!</span>
+        </div>
+      </div>
+
+      <div class="modal-footer border-top bg-light">
+        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal" id="btnCancelScan">Hủy Bỏ</button>
+        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" id="btnStartScan" onclick="startScanningProcess()">
+          <i class="bi bi-play-fill me-1"></i> Bắt Đầu Quét & Lưu
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -183,7 +292,137 @@
   </div>
 </div>
 
+<style>
+  .cursor-pointer { cursor: pointer; }
+  .option-card {
+    transition: all 0.2s ease-in-out;
+  }
+  .option-card:hover {
+    border-color: #0d6efd !important;
+    background-color: rgba(13, 110, 253, 0.02);
+  }
+  .active-option {
+    border-color: #0d6efd !important;
+    background-color: rgba(13, 110, 253, 0.05) !important;
+  }
+</style>
+
 <script>
+  let currentScanMode = 5;
+
+  function selectScanOption(mode) {
+    currentScanMode = mode;
+    const card5 = document.getElementById('cardOption5');
+    const cardAll = document.getElementById('cardOptionAll');
+    const r5 = document.getElementById('mode5');
+    const rAll = document.getElementById('modeAll');
+
+    if (mode === 5) {
+      card5.classList.add('active-option');
+      cardAll.classList.remove('active-option');
+      r5.checked = true;
+    } else {
+      cardAll.classList.add('active-option');
+      card5.classList.remove('active-option');
+      rAll.checked = true;
+    }
+  }
+
+  function appendTerminalLog(msg, colorClass = 'text-light') {
+    const term = document.getElementById('scanTerminalLog');
+    const p = document.createElement('div');
+    p.className = colorClass + ' mb-1';
+    p.textContent = msg;
+    term.appendChild(p);
+    term.scrollTop = term.scrollHeight;
+  }
+
+  async function startScanningProcess() {
+    const btnStart = document.getElementById('btnStartScan');
+    const btnCancel = document.getElementById('btnCancelScan');
+    const closeBtn = document.getElementById('closeScanModalBtn');
+    const progressArea = document.getElementById('scanProgressArea');
+    const progressBar = document.getElementById('scanProgressBar');
+    const percentEl = document.getElementById('scanProgressPercent');
+    const statusTitle = document.getElementById('scanStatusTitle');
+    const term = document.getElementById('scanTerminalLog');
+    const resultAlert = document.getElementById('scanResultAlert');
+    const delayVal = parseFloat(document.getElementById('scanDelaySelect').value) || 3.0;
+
+    btnStart.disabled = true;
+    btnCancel.disabled = true;
+    closeBtn.disabled = true;
+    btnStart.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Đang quét...';
+    
+    progressArea.style.display = 'block';
+    resultAlert.classList.add('d-none');
+    term.innerHTML = '';
+
+    appendTerminalLog(`[Bắt đầu] Chế độ: ${currentScanMode === 5 ? 'Quét 5 nhóm nhanh' : 'Quét tất cả nhóm'}`);
+    appendTerminalLog(`[Bảo vệ FB] Nghỉ giữa chừng: ${delayVal}s/nhóm để chống Checkpoint...`, 'text-warning');
+    
+    progressBar.style.width = '25%';
+    percentEl.textContent = '25%';
+    statusTitle.textContent = 'Đang kết nối phiên duyệt Facebook...';
+
+    try {
+      const res = await fetch('/facebook/groups/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          limit: currentScanMode,
+          delay: delayVal
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        progressBar.style.width = '100%';
+        percentEl.textContent = '100%';
+        progressBar.classList.remove('bg-primary');
+        progressBar.classList.add('bg-success');
+        statusTitle.textContent = '✅ Đã hoàn tất và lưu vào cơ sở dữ liệu!';
+
+        if (Array.isArray(data.logs)) {
+          term.innerHTML = '';
+          data.logs.forEach(l => {
+            const isRest = l.includes('nghỉ') || l.includes('⏸️');
+            const isDone = l.includes('Hoàn tất') || l.includes('Thành công');
+            appendTerminalLog(l, isDone ? 'text-success fw-bold' : (isRest ? 'text-warning' : 'text-light'));
+          });
+        }
+
+        resultAlert.classList.remove('d-none');
+        document.getElementById('scanResultText').textContent = 
+          `Đã quét thành công ${data.count} nhóm (${data.new_count || data.saved_count} nhóm mới) và lưu vào cơ sở dữ liệu an toàn!`;
+
+        btnStart.innerHTML = '<i class="bi bi-check-lg me-1"></i> Đã Lưu Xong';
+        btnCancel.textContent = 'Đóng & Xem Danh Sách';
+        btnCancel.disabled = false;
+        closeBtn.disabled = false;
+
+        btnCancel.onclick = () => window.location.reload();
+        closeBtn.onclick = () => window.location.reload();
+      } else {
+        throw new Error(data.message || 'Lỗi quét nhóm');
+      }
+    } catch (err) {
+      console.error(err);
+      appendTerminalLog(`[LỖI] ${err.message}`, 'text-danger fw-bold');
+      statusTitle.textContent = '⚠️ Có lỗi xảy ra trong quá trình quét';
+      progressBar.classList.remove('bg-primary');
+      progressBar.classList.add('bg-danger');
+      btnStart.disabled = false;
+      btnCancel.disabled = false;
+      closeBtn.disabled = false;
+      btnStart.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Thử Lại';
+    }
+  }
+
   function applyFilters() {
     const accId = document.getElementById('accountFilter').value;
     const perm = document.getElementById('permissionFilter').value;
@@ -206,33 +445,5 @@
         r.style.display = 'none';
       }
     });
-  }
-
-  async function scanCurrentAccountGroups() {
-    const accSelect = document.getElementById('accountFilter');
-    let accId = accSelect.value;
-    if (accId === 'all') {
-      const firstAcc = document.querySelector('#accountFilter option:nth-child(2)');
-      if (firstAcc) {
-        accId = firstAcc.value;
-      } else {
-        showToast('Vui lòng thêm tài khoản Facebook trước khi quét nhóm!', false);
-        return;
-      }
-    }
-
-    showToast('Đang tiến hành quét nhóm...', true);
-    try {
-      const res = await fetch('/facebook/accounts/scan-groups/' + accId, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        showToast(`Quét thành công ${data.count} nhóm!`, true);
-        setTimeout(() => window.location.reload(), 1200);
-      } else {
-        showToast(data.message || 'Lỗi quét nhóm', false);
-      }
-    } catch (err) {
-      showToast('Lỗi kết nối máy chủ', false);
-    }
   }
 </script>
