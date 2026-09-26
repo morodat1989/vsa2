@@ -17,7 +17,7 @@ echo [THU MUC GOC] %ROOT_DIR% >> "%DEBUG_LOG%"
 echo ========================================================
 echo         KHOI DONG FB TOOL BDS VA FASTAPI SERVER
 echo ========================================================
-echo [LOG] Nhat ky khoi dong duoc ghi tai: logs\start_debug.log
+echo [LOG] Nhat ky khoi dong: logs\start_debug.log
 echo.
 
 set "VENV_DIR=%ROOT_DIR%venv"
@@ -45,7 +45,9 @@ if exist "%VENV_PYTHON%" (
 
 :: 2. Tim Ungoogled Chromium
 set "CHROME_EXE="
-if exist "%ROOT_DIR%Ungoogled Chromium\chrome.exe" (
+if exist "%ROOT_DIR%Ungoogled Chromium\app\chrome.exe" (
+    set "CHROME_EXE=%ROOT_DIR%Ungoogled Chromium\app\chrome.exe"
+) else if exist "%ROOT_DIR%Ungoogled Chromium\chrome.exe" (
     set "CHROME_EXE=%ROOT_DIR%Ungoogled Chromium\chrome.exe"
 ) else if exist "%ROOT_DIR%Ungoogled Chromium\chromium.exe" (
     set "CHROME_EXE=%ROOT_DIR%Ungoogled Chromium\chromium.exe"
@@ -111,7 +113,7 @@ if "!CHOICE!"=="0" (
 if "!CHOICE!"=="!CREATE_OPT!" goto CREATE_PROFILE_STEP
 if "!CHOICE!"=="+" goto CREATE_PROFILE_STEP
 
-:: Lay ten profile truc tiep tu bien bang CALL SET (khong dung sub-shell)
+:: Lay ten profile truc tiep bang call set
 set "SELECTED_PROFILE="
 call set "SELECTED_PROFILE=%%PROF_!CHOICE!%%"
 
@@ -138,74 +140,70 @@ if "!SELECTED_PROFILE!"=="NONE" (
 ) else (
     echo [OK] Profile duoc chon: "!SELECTED_PROFILE!"
     echo      Duong dan: "%PROFILES_DIR%\!SELECTED_PROFILE!"
-    echo [PROFILE SELECTED] %SELECTED_PROFILE% >> "%DEBUG_LOG%"
+    echo [PROFILE SELECTED] !SELECTED_PROFILE! >> "%DEBUG_LOG%"
 )
 
-:: 4. Khoi dong FastAPI Server o cua so rieng & ghi log uvicorn
+:: 4. Tao launcher uvicorn rieng biet
 echo.
 echo [INFO] Dang khoi dong FastAPI Server tai http://127.0.0.1:8000 ...
 echo [INFO] Dang khoi dong uvicorn >> "%DEBUG_LOG%"
 
-set "UVICORN_LOG=%LOGS_DIR%\uvicorn.log"
-
-:: Tao file run_server.bat phu de tranh loi quote cua cmd /k
 set "SERVER_LAUNCHER=%LOGS_DIR%\run_server.bat"
-(
-    echo @echo off
-    echo chcp 65001 ^>nul
-    echo title FastAPI Server VSA2
-    echo cd /d "%ROOT_DIR%"
-    echo echo [SERVER] Dang chay uvicorn tren cong 8000...
-    echo "%VENV_PYTHON%" -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-    echo if %%errorlevel%% neq 0 pause
-) > "%SERVER_LAUNCHER%"
+echo @echo off > "%SERVER_LAUNCHER%"
+echo chcp 65001 ^>nul >> "%SERVER_LAUNCHER%"
+echo title FastAPI Server VSA2 >> "%SERVER_LAUNCHER%"
+echo cd /d "%ROOT_DIR%" >> "%SERVER_LAUNCHER%"
+echo echo ======================================================== >> "%SERVER_LAUNCHER%"
+echo echo   FastAPI Server dang chay tai: http://127.0.0.1:8000 >> "%SERVER_LAUNCHER%"
+echo echo ======================================================== >> "%SERVER_LAUNCHER%"
+echo "%VENV_PYTHON%" -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload >> "%SERVER_LAUNCHER%"
+echo pause >> "%SERVER_LAUNCHER%"
 
 start "FastAPI Server VSA2" cmd /k "%SERVER_LAUNCHER%"
 
-:: 5. Kiem tra ket noi server san sang
+:: 5. Kiem tra ket noi server san sang bang vong lap khong dung goto trong block
 echo [INFO] Dang kiem tra ket noi server...
 set /a ATTEMPTS=0
+
 :WAIT_SERVER_LOOP
 set /a ATTEMPTS+=1
 timeout /t 1 /nobreak >nul
 
 powershell -Command "$t = New-Object Net.Sockets.TcpClient; try { $t.Connect('127.0.0.1', 8000); $t.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [OK] FastAPI Server da san sang tai http://127.0.0.1:8000!
-    echo [SERVER READY] Thanh cong sau %ATTEMPTS% giay >> "%DEBUG_LOG%"
-    goto OPEN_BROWSER_STEP
-)
+if %errorlevel% equ 0 goto SERVER_READY
+if %ATTEMPTS% geq 10 goto SERVER_READY
 
-if %ATTEMPTS% geq 15 (
-    echo [CANH BAO] Server hoi cham nhung van se mo trinh duyet...
-    echo [SERVER TIMEOUT] Bo qua kiem tra ket noi >> "%DEBUG_LOG%"
-    goto OPEN_BROWSER_STEP
-)
 goto WAIT_SERVER_LOOP
 
+:SERVER_READY
+echo [OK] FastAPI Server da san sang tai http://127.0.0.1:8000!
+echo [SERVER READY] Ket noi thanh cong sau %ATTEMPTS% giay >> "%DEBUG_LOG%"
+
 :OPEN_BROWSER_STEP
-echo.
+echo [STEP] Bat dau khoi chay trinh duyet... >> "%DEBUG_LOG%"
 if "!SELECTED_PROFILE!"=="NONE" goto DONE_ALL
 
 set "ACTIVE_PROFILE_DIR=%PROFILES_DIR%\!SELECTED_PROFILE!"
 if not exist "!ACTIVE_PROFILE_DIR!" mkdir "!ACTIVE_PROFILE_DIR!" 2>nul
 
-if defined CHROME_EXE (
-    if exist "%CHROME_EXE%" (
-        echo [OK] Ungoogled Chromium: "%CHROME_EXE%"
-        echo [INFO] Dang mo Profile "!SELECTED_PROFILE!" voi 2 tab va Remote Debugging (port 9222)...
-        echo [LAUNCH CHROMIUM] "%CHROME_EXE%" --user-data-dir="!ACTIVE_PROFILE_DIR!" >> "%DEBUG_LOG%"
-        start "" "%CHROME_EXE%" --user-data-dir="!ACTIVE_PROFILE_DIR!" --remote-debugging-port=9222 --no-first-run --no-default-browser-check "http://127.0.0.1:8000" "https://www.facebook.com"
-        goto DONE_ALL
-    )
-)
+if not defined CHROME_EXE goto LAUNCH_DEFAULT_BROWSER
+if not exist "%CHROME_EXE%" goto LAUNCH_DEFAULT_BROWSER
 
+echo [OK] Ungoogled Chromium: "%CHROME_EXE%"
+echo [INFO] Dang mo Profile "!SELECTED_PROFILE!" voi 2 tab va Remote Debugging (port 9222)...
+echo [LAUNCH CHROMIUM] "%CHROME_EXE%" --user-data-dir="!ACTIVE_PROFILE_DIR!" >> "%DEBUG_LOG%"
+
+start "" "%CHROME_EXE%" --user-data-dir="!ACTIVE_PROFILE_DIR!" --remote-debugging-port=9222 --no-first-run --no-default-browser-check "http://127.0.0.1:8000" "https://www.facebook.com"
+goto DONE_ALL
+
+:LAUNCH_DEFAULT_BROWSER
 echo [CANH BAO] Khong tim thay Ungoogled Chromium, mo bang trinh duyet mac dinh...
 echo [LAUNCH DEFAULT BROWSER] >> "%DEBUG_LOG%"
 start http://127.0.0.1:8000
 start https://www.facebook.com
 
 :DONE_ALL
+echo [STEP] Hoan tat quy trinh khoi dong >> "%DEBUG_LOG%"
 echo.
 echo ========================================================
 echo   HE THONG DA KHOI DONG THANH CONG!
