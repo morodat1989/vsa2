@@ -128,13 +128,27 @@
               <span class="text-muted small">Đã sắp xếp theo <b>số thành viên từ cao xuống thấp</b></span>
             </div>
             
-            <div class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fs-6" id="reachEstimateBadge">
-              Đã chọn: <b id="selectedGroupCountText">0</b> nhóm (~<b id="selectedMembersCountText">0</b> TV)
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <div class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fs-6" id="reachEstimateBadge">
+                Đã chọn: <b id="selectedGroupCountText">0</b> nhóm (~<b id="selectedMembersCountText">0</b> TV)
+              </div>
+              
+              <!-- NÚT GÓC ĐÓ: MỞ TAB MỚI CHỌN NHIỀU NHÓM (THEO YÊU CẦU CỦA BẠN) -->
+              <a href="/facebook/groups/picker?listing_id={{ listing.id }}" target="_blank" 
+                 class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm fw-bold d-inline-flex align-items-center gap-1.5" 
+                 id="btnOpenNewTabGroupPicker" title="Mở bảng lớn trên Tab trình duyệt mới để chọn nhiều nhóm thoải mái">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                <span>Mở Tab Mới Chọn Nhiều Nhóm</span>
+              </a>
+              
+              <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5" data-bs-toggle="modal" data-bs-target="#bigGroupPickerModal" title="Mở bảng lớn (Modal)">
+                <i class="fa-solid fa-table me-1"></i> Bảng Lớn
+              </button>
             </div>
           </div>
 
           <!-- Các nút chọn lọc thông minh -->
-          <div class="d-flex flex-wrap gap-2 mb-3">
+          <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" onclick="selectTopGroups(5)">
               <i class="fa-solid fa-star text-warning me-1"></i> Chọn 5 nhóm đông nhất
             </button>
@@ -149,21 +163,32 @@
             </button>
           </div>
 
-          <!-- Danh sách nhóm dạng cuộn có checkbox -->
-          <div class="border rounded-3 overflow-hidden mb-3" style="max-height: 380px; overflow-y: auto;">
+          <!-- Ô tìm kiếm nhanh nhóm trực tiếp -->
+          <div class="input-group input-group-sm mb-2 shadow-xs">
+            <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+            <input type="text" id="inlineGroupSearchInput" class="form-control border-start-0" placeholder="🔍 Tìm nhanh tên hoặc ID nhóm trong danh sách..." oninput="filterInlineGroups(this.value)">
+            <button class="btn btn-outline-secondary" type="button" onclick="clearInlineGroupSearch()"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+
+          <!-- Danh sách nhóm dạng cuộn có checkbox - Thanh cuộn màu xanh nổi bật, hỗ trợ kéo chuột & cuộn phím -->
+          <div class="border rounded-3 mb-2 group-scroll-box" id="inlineGroupScrollBox" style="max-height: 440px; min-height: 280px; overflow-y: scroll !important; overflow-x: auto;">
             <table class="table table-hover align-middle mb-0" id="groupSelectTable">
               <thead class="table-light sticky-top">
                 <tr>
-                  <th style="width: 40px;" class="text-center">
-                    <input class="form-check-input" type="checkbox" id="masterGroupCheckbox" onchange="selectAllGroups(this.checked)">
+                  <th style="width: 44px;" class="text-center">
+                    <input class="form-check-input" type="checkbox" id="masterGroupCheckbox" onchange="selectAllGroups(this.checked)" title="Chọn tất cả">
                   </th>
                   <th>Tên Hội Nhóm</th>
-                  <th style="width: 130px;" class="text-end pe-3">Số Thành Viên</th>
+                  <th style="width: 140px;" class="text-end pe-3">Số Thành Viên</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="groupSelectTableBody">
                 {% for g in groups %}
-                <tr class="group-select-row cursor-pointer" onclick="toggleGroupRowCheckbox('grp-{{ g.group_id }}')">
+                <tr class="group-select-row cursor-pointer" 
+                    id="inline-row-{{ g.group_id }}"
+                    data-name="{{ g.name|lower }}" 
+                    data-id="{{ g.group_id }}"
+                    onclick="toggleGroupRowCheckbox('grp-{{ g.group_id }}')">
                   <td class="text-center" onclick="event.stopPropagation()">
                     <input class="form-check-input target-group-cb" 
                            type="checkbox" 
@@ -174,7 +199,7 @@
                            onchange="updateGroupSelectionStats()">
                   </td>
                   <td>
-                    <div class="fw-bold text-dark text-truncate" style="max-width: 280px;" title="{{ g.name }}">
+                    <div class="fw-bold text-dark text-truncate inline-group-name" style="max-width: 270px;" title="{{ g.name }}">
                       {{ g.name }}
                     </div>
                     <div class="text-muted small font-monospace" style="font-size: 0.75rem;">ID: {{ g.group_id }}</div>
@@ -194,6 +219,21 @@
                 {% endfor %}
               </tbody>
             </table>
+          </div>
+
+          <!-- Thanh điều hướng cuộn nhanh (Lên đầu / Xuống đáy) -->
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted small" style="font-size: 0.75rem;" id="inlineGroupCountLabel">
+              <i class="fa-solid fa-circle-info text-primary me-1"></i>Có {{ groups|length }} nhóm (kéo thanh xanh bên phải để xem tiếp)
+            </span>
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-secondary py-0.5 px-2" onclick="scrollInlineBox('top')">
+                <i class="fa-solid fa-arrow-up me-1"></i> Lên đầu
+              </button>
+              <button type="button" class="btn btn-outline-secondary py-0.5 px-2" onclick="scrollInlineBox('bottom')">
+                <i class="fa-solid fa-arrow-down me-1"></i> Xuống đáy
+              </button>
+            </div>
           </div>
 
           <!-- Nút Đăng lên Hội Nhóm -->
@@ -459,15 +499,216 @@
   </div>
 </div>
 
+<!-- ================= MODAL: BẢNG LỚN CHỌN NHIỀU NHÓM (TOÀN DIỆN & TÌM KIẾM) ================= -->
+<div class="modal fade" id="bigGroupPickerModal" tabindex="-1" aria-labelledby="bigGroupPickerModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-bottom bg-primary bg-opacity-10 py-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-users-rectangle text-primary fs-4"></i>
+          <div>
+            <h5 class="modal-title fw-bold text-dark mb-0" id="bigGroupPickerModalLabel">
+              Bảng Chọn Hội Nhóm Đăng Bài (Quy Mô Lớn)
+            </h5>
+            <span class="text-muted small">Sắp xếp theo thứ tự số lượng thành viên từ cao xuống thấp (giảm dần)</span>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body p-4">
+        <!-- Search & Filter Controls -->
+        <div class="card p-3 bg-light border-0 mb-3 rounded-3 shadow-xs">
+          <div class="row g-2 align-items-center">
+            <div class="col-md-5">
+              <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" id="bigModalSearchInput" class="form-control border-start-0" placeholder="Tìm theo tên nhóm hoặc ID (VD: Hải Phòng, Cầu Giấy, Hà Nội...)" onkeyup="filterBigModalGroups()">
+                <button class="btn btn-outline-secondary border-start-0" type="button" onclick="clearBigModalSearch()"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            </div>
+
+            <div class="col-md-3">
+              <select id="bigModalSizeFilter" class="form-select" onchange="filterBigModalGroups()">
+                <option value="0">Tất cả quy mô nhóm</option>
+                <option value="100000">> 100,000 thành viên</option>
+                <option value="50000">> 50,000 thành viên</option>
+                <option value="20000">> 20,000 thành viên</option>
+              </select>
+            </div>
+
+            <div class="col-md-4 text-md-end">
+              <span class="badge bg-primary fs-6 px-3 py-2 rounded-pill shadow-xs" id="bigModalStatsBadge">
+                Đã chọn: <b id="bigModalSelectedCount">0</b> nhóm (~<b id="bigModalSelectedMembers">0</b> TV)
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Select Buttons in Modal -->
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" onclick="selectTopGroupsBigModal(5)">
+            <i class="fa-solid fa-star text-warning me-1"></i> Chọn 5 nhóm đông nhất
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" onclick="selectTopGroupsBigModal(10)">
+            <i class="fa-solid fa-fire text-danger me-1"></i> Chọn 10 nhóm đông nhất
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" onclick="selectTopGroupsBigModal(20)">
+            <i class="fa-solid fa-bolt text-warning me-1"></i> Chọn 20 nhóm đông nhất
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5" onclick="selectAllBigModal(true)">
+            Chọn tất cả hiển thị
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5" onclick="selectAllBigModal(false)">
+            Bỏ chọn tất cả
+          </button>
+        </div>
+
+        <!-- Full Table with smooth scroll -->
+        <div class="border rounded-3 overflow-hidden" style="max-height: 480px; overflow-y: auto;">
+          <table class="table table-hover align-middle mb-0" id="bigModalGroupTable">
+            <thead class="table-light sticky-top shadow-xs">
+              <tr>
+                <th style="width: 48px;" class="text-center">
+                  <input class="form-check-input" type="checkbox" id="bigModalMasterCheckbox" onchange="selectAllBigModal(this.checked)">
+                </th>
+                <th>Tên Hội Nhóm Facebook</th>
+                <th style="width: 170px;">Số Lượng Thành Viên</th>
+                <th style="width: 140px;">Quyền Riêng Tư</th>
+                <th style="width: 100px;" class="text-end pe-3">Xem Nhóm</th>
+              </tr>
+            </thead>
+            <tbody id="bigModalGroupTableBody">
+              {% for g in groups %}
+              <tr class="big-modal-group-row cursor-pointer" 
+                  data-name="{{ g.name|lower }}" 
+                  data-id="{{ g.group_id }}" 
+                  data-members="{{ g.members_count or 0 }}"
+                  onclick="toggleBigModalRowCheckbox('modal-grp-{{ g.group_id }}')">
+                <td class="text-center" onclick="event.stopPropagation()">
+                  <input class="form-check-input big-modal-cb" 
+                         type="checkbox" 
+                         value="{{ g.group_id }}" 
+                         id="modal-grp-{{ g.group_id }}"
+                         data-members="{{ g.members_count or 0 }}"
+                         data-name="{{ g.name }}"
+                         onchange="updateBigModalStats()">
+                </td>
+                <td>
+                  <div class="fw-bold text-dark fs-6 mb-0">{{ g.name }}</div>
+                  <div class="text-muted small font-monospace">ID: {{ g.group_id }}</div>
+                </td>
+                <td>
+                  <span class="badge bg-secondary-subtle text-dark fw-bold fs-6 px-2.5 py-1">
+                    <i class="fa-solid fa-users me-1 text-muted"></i>{{ "{:,}".format(g.members_count) if g.members_count else '---' }} TV
+                  </span>
+                </td>
+                <td>
+                  <span class="badge {{ 'bg-success-subtle text-success' if g.privacy == 'PUBLIC' else 'bg-warning-subtle text-warning' }} fw-semibold">
+                    {{ 'Công khai' if g.privacy == 'PUBLIC' else 'Nhóm kín' }}
+                  </span>
+                </td>
+                <td class="text-end pe-3" onclick="event.stopPropagation()">
+                  <a href="https://facebook.com/groups/{{ g.group_id }}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5 py-0.5">
+                    Mở <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size: 0.7rem;"></i>
+                  </a>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" class="text-center py-5 text-muted">Chưa có nhóm nào trong kho dữ liệu.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer border-top bg-light">
+        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Hủy bỏ</button>
+        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" onclick="applyBigModalSelection()">
+          <i class="fa-solid fa-check me-1"></i> Áp Dụng <span id="btnApplyCount">0</span> Nhóm Đã Chọn
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <style>
   .cursor-pointer { cursor: pointer; }
   .group-select-row.selected-group-tr {
     background-color: rgba(13, 110, 253, 0.08) !important;
   }
+  .big-modal-group-row.selected-big-row {
+    background-color: rgba(13, 110, 253, 0.08) !important;
+  }
+  /* High contrast scrollbar - Luôn hiển thị thanh trượt màu xanh trên Windows để dễ kéo thả */
+  .group-scroll-box {
+    scrollbar-width: thin;
+    scrollbar-color: #0d6efd #e2e8f0;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+  .group-scroll-box::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  .group-scroll-box::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 6px;
+  }
+  .group-scroll-box::-webkit-scrollbar-thumb {
+    background: #0d6efd;
+    border-radius: 6px;
+    border: 2px solid #e2e8f0;
+  }
+  .group-scroll-box::-webkit-scrollbar-thumb:hover {
+    background: #0b5ed7;
+  }
 </style>
 
 <script>
   const CURRENT_LISTING_ID = {{ listing.id }};
+
+  // Cuộn nhanh hộp danh sách lên đầu hoặc xuống đáy
+  function scrollInlineBox(direction) {
+    const box = document.getElementById('inlineGroupScrollBox');
+    if (!box) return;
+    if (direction === 'top') {
+      box.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+    }
+  }
+
+  // Tìm kiếm nhanh nhóm trực tiếp trong hộp cuộn
+  function filterInlineGroups(query) {
+    const q = (query || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#groupSelectTableBody tr.group-select-row');
+    let visible = 0;
+    rows.forEach(r => {
+      const name = r.dataset.name || '';
+      const gid = r.dataset.id || '';
+      if (!q || name.includes(q) || gid.includes(q)) {
+        r.style.display = '';
+        visible++;
+      } else {
+        r.style.display = 'none';
+      }
+    });
+    const label = document.getElementById('inlineGroupCountLabel');
+    if (label) {
+      label.innerHTML = `<i class="fa-solid fa-circle-info text-primary me-1"></i>Hiển thị <b>${visible}</b> nhóm (kéo thanh xanh bên phải để xem tiếp)`;
+    }
+  }
+
+  function clearInlineGroupSearch() {
+    const input = document.getElementById('inlineGroupSearchInput');
+    if (input) {
+      input.value = '';
+      filterInlineGroups('');
+    }
+  }
 
   // Toggle selection on row click
   function toggleGroupRowCheckbox(cbId) {
@@ -483,11 +724,13 @@
     const checkboxes = document.querySelectorAll('.target-group-cb');
     let selectedCount = 0;
     let totalMembers = 0;
+    const selectedIds = [];
 
     checkboxes.forEach(cb => {
       const row = cb.closest('tr');
       if (cb.checked) {
         selectedCount++;
+        selectedIds.push(cb.value);
         totalMembers += parseInt(cb.getAttribute('data-members')) || 0;
         if (row) row.classList.add('selected-group-tr');
       } else {
@@ -497,6 +740,11 @@
 
     document.getElementById('selectedGroupCountText').textContent = selectedCount;
     document.getElementById('selectedMembersCountText').textContent = totalMembers.toLocaleString('vi-VN');
+
+    // Lưu vào localStorage để Tab mới cũng đồng bộ được
+    try {
+      localStorage.setItem('fb_selected_groups_' + CURRENT_LISTING_ID, JSON.stringify(selectedIds));
+    } catch(e){}
 
     const masterCb = document.getElementById('masterGroupCheckbox');
     if (masterCb) {
@@ -748,9 +996,100 @@
     }
   }
 
-  // Default: Select Top 5 Groups on page load if available
+  // Đồng bộ danh sách ID nhóm được chọn từ Tab mới
+  function applySelectedGroupIds(groupIds) {
+    if (!Array.isArray(groupIds)) return;
+    const idSet = new Set(groupIds.map(String));
+    document.querySelectorAll('.target-group-cb').forEach(cb => {
+      cb.checked = idSet.has(String(cb.value));
+    });
+    updateGroupSelectionStats();
+  }
+
+  function showSyncToastNotification(count) {
+    const toastEl = document.getElementById('groupSyncToast');
+    const msgEl = document.getElementById('groupSyncToastMsg');
+    if (toastEl && msgEl) {
+      msgEl.textContent = `Đã đồng bộ ${count} nhóm từ Tab chọn nhóm mới!`;
+      toastEl.classList.remove('d-none');
+      setTimeout(() => {
+        toastEl.classList.add('d-none');
+      }, 4000);
+    }
+  }
+
+  // Lắng nghe sự kiện đồng bộ từ Tab Mới (window.opener postMessage)
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'FB_GROUPS_APPLIED') {
+      const gids = event.data.groupIds || [];
+      applySelectedGroupIds(gids);
+      showSyncToastNotification(gids.length);
+    }
+  });
+
+  // Lắng nghe qua localStorage khi Tab mới bấm "Áp Dụng"
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'fb_selected_groups_' + CURRENT_LISTING_ID || e.key === 'fb_selected_groups_latest') {
+      try {
+        const raw = localStorage.getItem('fb_selected_groups_' + CURRENT_LISTING_ID);
+        if (raw) {
+          const ids = JSON.parse(raw);
+          applySelectedGroupIds(ids);
+          showSyncToastNotification(ids.length);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  });
+
+  // Khi người dùng click quay lại tab Soạn bài này
+  window.addEventListener('focus', function() {
+    try {
+      const raw = localStorage.getItem('fb_selected_groups_' + CURRENT_LISTING_ID);
+      if (raw) {
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids)) {
+          const currentChecked = Array.from(document.querySelectorAll('.target-group-cb:checked')).map(cb => cb.value);
+          if (JSON.stringify(currentChecked.sort()) !== JSON.stringify(ids.sort())) {
+            applySelectedGroupIds(ids);
+            showSyncToastNotification(ids.length);
+          }
+        }
+      }
+    } catch (e) {}
+  });
+
+  // On page load: Kiểm tra selection đã lưu hoặc chọn 5 nhóm đông nhất
   document.addEventListener('DOMContentLoaded', () => {
-    selectTopGroups(5);
+    let loaded = false;
+    try {
+      const raw = localStorage.getItem('fb_selected_groups_' + CURRENT_LISTING_ID);
+      if (raw) {
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids) && ids.length > 0) {
+          applySelectedGroupIds(ids);
+          loaded = true;
+        }
+      }
+    } catch(e){}
+
+    if (!loaded) {
+      selectTopGroups(5);
+    }
   });
 </script>
+
+<!-- Toast thông báo đồng bộ nhóm từ Tab mới -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 2050;">
+  <div id="groupSyncToast" class="toast align-items-center text-bg-success border-0 shadow-lg rounded-4 d-none" role="alert">
+    <div class="d-flex">
+      <div class="toast-body fw-semibold py-2.5 px-3 d-flex align-items-center gap-2">
+        <i class="fa-solid fa-circle-check fs-5"></i>
+        <span id="groupSyncToastMsg">Đã đồng bộ nhóm từ Tab chọn nhóm mới!</span>
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="document.getElementById('groupSyncToast').classList.add('d-none')"></button>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -137,11 +137,19 @@
 
         <!-- Groups select -->
         <div class="mb-3">
-          <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
             <label class="form-label fw-semibold mb-0">2. Chọn Nhóm Đăng Bài:</label>
-            <div class="btn-group btn-group-sm">
-              <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="selectAllGroups(true)">Chọn tất cả</button>
-              <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="selectAllGroups(false)">Bỏ chọn</button>
+            <div class="d-flex align-items-center gap-2">
+              <a href="/facebook/groups/picker?listing_id=<%= listing.id %>" target="_blank" 
+                 class="btn btn-sm btn-primary rounded-pill px-3 shadow-xs fw-bold d-inline-flex align-items-center gap-1.5" 
+                 title="Mở bảng lớn trên Tab trình duyệt mới để chọn nhiều nhóm thoải mái">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                <span>Mở Tab Mới Chọn Nhiều Nhóm</span>
+              </a>
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="selectAllGroups(true)">Tất cả</button>
+                <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="selectAllGroups(false)">Bỏ chọn</button>
+              </div>
             </div>
           </div>
 
@@ -317,6 +325,49 @@
     const count = document.querySelectorAll('.group-checkbox:checked').length;
     document.getElementById('selectedGroupsCount').textContent = `Đã chọn: ${count} nhóm`;
   }
+
+  // Đồng bộ nhóm từ Tab Mới (window.opener postMessage, localStorage, focus)
+  function applySelectedGroupIds(groupIds) {
+    if (!Array.isArray(groupIds)) return;
+    const idSet = new Set(groupIds.map(String));
+    document.querySelectorAll('.group-checkbox').forEach(cb => {
+      cb.checked = idSet.has(String(cb.value));
+    });
+    updateSelectedCount();
+  }
+
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'FB_GROUPS_APPLIED') {
+      const gids = event.data.groupIds || [];
+      applySelectedGroupIds(gids);
+      showToast(`Đã đồng bộ ${gids.length} nhóm từ Tab chọn nhóm mới!`, true);
+    }
+  });
+
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'fb_selected_groups_' + listingId || e.key === 'fb_selected_groups_latest') {
+      try {
+        const raw = localStorage.getItem('fb_selected_groups_' + listingId);
+        if (raw) {
+          const ids = JSON.parse(raw);
+          applySelectedGroupIds(ids);
+          showToast(`Đã đồng bộ ${ids.length} nhóm từ Tab chọn nhóm mới!`, true);
+        }
+      } catch (err) {}
+    }
+  });
+
+  window.addEventListener('focus', function() {
+    try {
+      const raw = localStorage.getItem('fb_selected_groups_' + listingId);
+      if (raw) {
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids)) {
+          applySelectedGroupIds(ids);
+        }
+      }
+    } catch (e) {}
+  });
 
   document.querySelectorAll('.group-checkbox').forEach(cb => {
     cb.addEventListener('change', updateSelectedCount);

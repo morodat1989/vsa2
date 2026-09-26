@@ -1,6 +1,7 @@
 import os
 import subprocess
 import datetime
+from typing import Optional
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -218,6 +219,27 @@ def delete_group(group_id: int, db: Session = Depends(get_db)):
         db.delete(grp)
         db.commit()
     return RedirectResponse(url="/facebook/groups", status_code=303)
+
+@router.get("/groups/picker")
+def group_picker(request: Request, listing_id: Optional[int] = None, db: Session = Depends(get_db)):
+    listing = None
+    if listing_id:
+        listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    
+    # Tự động sắp xếp theo thứ tự: Số lượng thành viên từ cao xuống thấp (giảm dần)
+    groups = db.query(FacebookGroup).order_by(FacebookGroup.members_count.desc()).all()
+    
+    return templates.TemplateResponse(
+        request=request,
+        name="group_picker.html",
+        context={
+            "request": request,
+            "active_page": "groups",
+            "page_title": "Bảng Chọn Nhóm Facebook - " + (listing.title if listing else "FB Tool BĐS"),
+            "listing": listing,
+            "groups": groups
+        }
+    )
 
 @router.post("/groups/scan")
 async def scan_groups_api(request: Request, db: Session = Depends(get_db)):

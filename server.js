@@ -368,6 +368,18 @@ app.post('/facebook/accounts/scan-groups/:id', async (req, res) => {
 });
 
 // 5. Facebook Groups
+app.get('/facebook/groups/picker', (req, res) => {
+  const listingId = req.query.listing_id ? Number(req.query.listing_id) : null;
+  const listing = listingId ? db.getListing(listingId) : null;
+  const groups = db.getAllGroups().sort((a, b) => (b.members_count || 0) - (a.members_count || 0));
+
+  res.render('group_picker', {
+    pageTitle: 'Bảng Chọn Nhóm Facebook - ' + (listing ? listing.title : 'FB Tool BĐS'),
+    listing,
+    groups
+  });
+});
+
 app.get('/facebook/groups', (req, res) => {
   const accounts = db.getAccounts();
   const selectedAccountId = req.query.account_id || 'all';
