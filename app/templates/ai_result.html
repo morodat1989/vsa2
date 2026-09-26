@@ -1,84 +1,756 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="mb-4">
-  <a href="/listings" class="btn btn-sm btn-outline-secondary mb-2"><i class="fa-solid fa-arrow-left me-1"></i> Quay lại kho BĐS</a>
-  <h4 class="fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles text-success me-2"></i>Soạn Thảo Bài Viết BĐS Bằng AI</h4>
-  <p class="text-muted mb-0 small">BĐS: <b>{{ listing.title }}</b> ({{ listing.price }} Tỷ - {{ listing.area }} m²)</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div>
+    <a href="/listings" class="btn btn-sm btn-outline-secondary mb-2">
+      <i class="fa-solid fa-arrow-left me-1"></i> Quay lại kho BĐS
+    </a>
+    <h4 class="fw-bold mb-1">
+      <i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>Soạn Bài & Xuất Bản BĐS Đa Kênh
+    </h4>
+    <p class="text-muted mb-0 small">
+      BĐS: <strong class="text-dark">{{ listing.title }}</strong> | 
+      Giá: <span class="badge bg-danger-subtle text-danger fs-6 fw-bold">{{ listing.price }} Tỷ</span> | 
+      Diện tích: <span class="badge bg-primary-subtle text-primary">{{ listing.area }} m²</span>
+    </p>
+  </div>
+  
+  <div class="d-flex align-items-center gap-2">
+    <!-- Marketplace Status Badge -->
+    <div class="card p-2 px-3 border shadow-xs bg-body d-flex flex-row align-items-center gap-2">
+      <i class="fa-solid fa-shop text-primary fs-5"></i>
+      <div>
+        <div class="small text-muted" style="font-size: 0.72rem;">Trạng thái Marketplace:</div>
+        <span class="badge {{ 'bg-success' if listing.marketplace_status == 'active' else ('bg-warning text-dark' if listing.marketplace_status == 'in_review' else ('bg-danger' if listing.marketplace_status == 'expired' else 'bg-secondary')) }}" id="topMpStatusBadge">
+          {{ '🟢 Đang hoạt động' if listing.marketplace_status == 'active' else ('🟡 Chờ duyệt' if listing.marketplace_status == 'in_review' else ('🔴 Hết hạn' if listing.marketplace_status == 'expired' else '⚪ Chưa đăng')) }}
+        </span>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1 ms-1" onclick="checkMarketplaceStatusModal()" title="Kiểm tra trạng thái Marketplace">
+        <i class="fa-solid fa-rotate"></i>
+      </button>
+    </div>
+  </div>
 </div>
 
-<div class="row g-4">
-  <div class="col-lg-7">
-    <div class="card border-0 shadow-sm rounded-4 p-4">
-      <h6 class="fw-bold mb-3">Nội Dung Bài Đăng Tạo Bởi AI:</h6>
-      <form action="/facebook/publish" method="POST">
-        <input type="hidden" name="listing_id" value="{{ listing.id }}">
-        
-        <div class="mb-3">
-          <textarea name="content" id="aiContent" class="form-control font-monospace" rows="12" style="font-size: 0.95rem;">{{ ai_content }}</textarea>
-        </div>
+<!-- ================= TÙY CHỌN KÊNH XUẤT BẢN: TAB NAVIGATION ================= -->
+<ul class="nav nav-pills nav-fill gap-2 p-1 bg-body-tertiary rounded-4 mb-4 shadow-sm" id="postChannelsTab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active rounded-pill fw-bold py-2.5" id="groups-tab" data-bs-toggle="tab" data-bs-target="#tab-groups" type="button" role="tab">
+      <i class="fa-solid fa-users-rectangle me-2"></i>1. Đăng Lên Hội Nhóm Facebook (Group Posting)
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link rounded-pill fw-bold py-2.5" id="marketplace-tab" data-bs-toggle="tab" data-bs-target="#tab-marketplace" type="button" role="tab">
+      <i class="fa-solid fa-shop me-2"></i>2. Đăng Lên Facebook Marketplace (AI Auto-Fill)
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link rounded-pill fw-bold py-2.5" id="history-tab" data-bs-toggle="tab" data-bs-target="#tab-history" type="button" role="tab">
+      <i class="fa-solid fa-clock-rotate-left me-2"></i>3. Lịch Sử Đăng Tin Của Căn Này (<span id="historyTabCount">{{ listing_logs|length }}</span>)
+    </button>
+  </li>
+</ul>
 
-        <div class="d-flex gap-2 mb-4">
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('aiContent').value); alert('Đã sao chép nội dung!')">
-            <i class="fa-solid fa-copy me-1"></i> Copy Nội Dung
+<div class="tab-content" id="channelsTabContent">
+  <!-- ================= TAB 1: ĐĂNG LÊN HỘI NHÓM ================= -->
+  <div class="tab-pane fade show active" id="tab-groups" role="tabpanel">
+    <div class="row g-4">
+      <!-- Cột trái: Nội dung bài viết + Cơ chế chống Spam -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-4 h-100 bg-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0 text-dark">
+              <i class="fa-solid fa-pen-nib text-primary me-2"></i>Nội Dung Bài Đăng (AI Tạo):
+            </h6>
+            <a href="/facebook/ai-write/{{ listing.id }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" title="Tạo lại nội dung mới bằng Gemini">
+              <i class="fa-solid fa-arrows-rotate me-1"></i> Sinh Lại AI
+            </a>
+          </div>
+
+          <div class="mb-3">
+            <textarea name="content" id="groupPostContent" class="form-control font-monospace" rows="11" style="font-size: 0.92rem; line-height: 1.5;">{{ ai_content }}</textarea>
+          </div>
+
+          <!-- BẢO VỆ CHỐNG SPAM & NGUYÊN TẮC CỘNG ĐỒNG FB -->
+          <div class="p-3 bg-light rounded-3 border border-warning-subtle mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="fw-bold text-dark small"><i class="fa-solid fa-shield-halved text-warning me-1"></i> Cơ chế Chống Checkpoint & Chống Lỗi Spam FB:</span>
+              <span class="badge bg-warning text-dark"><i class="fa-solid fa-lock me-1"></i>Anti-Ban</span>
+            </div>
+
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="enableSpintaxCheck" checked>
+              <label class="form-check-label small fw-semibold" for="enableSpintaxCheck">
+                Tự động Spintax biến thể nội dung cho từng nhóm
+              </label>
+              <div class="text-muted small" style="font-size: 0.78rem;">
+                Mỗi nhóm sẽ nhận một câu Hook mở đầu, emoji và cấu trúc khác nhau để tránh thuật toán quét bài trùng lặp.
+              </div>
+            </div>
+
+            <div class="row g-2 align-items-center">
+              <div class="col-auto">
+                <label class="small text-muted fw-semibold">Thời gian nghỉ giữa các nhóm:</label>
+              </div>
+              <div class="col-auto">
+                <select id="groupPostDelaySelect" class="form-select form-select-sm">
+                  <option value="30.0">Nghỉ 30 giây / nhóm (An toàn)</option>
+                  <option value="45.0" selected>Nghỉ 45 giây / nhóm (Khuyên dùng)</option>
+                  <option value="60.0">Nghỉ 60 giây / nhóm (Cực kỳ an toàn)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tài khoản đăng -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Chọn tài khoản Profile thực hiện:</label>
+            <select id="selectedAccountSelect" class="form-select">
+              {% for acc in accounts %}
+              <option value="{{ acc.id }}">{{ acc.name }} (UID: {{ acc.uid }}) - Trạng thái: {{ acc.status }}</option>
+              {% else %}
+              <option value="">Chưa có tài khoản Facebook nào kết nối</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cột phải: Chọn lọc danh sách nhóm (Sắp xếp TV giảm dần + Nút chọn nhanh) -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-4 h-100 bg-body">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+              <h6 class="fw-bold mb-0 text-dark">
+                <i class="fa-solid fa-users text-primary me-2"></i>Chọn Nhóm Mục Tiêu:
+              </h6>
+              <span class="text-muted small">Đã sắp xếp theo <b>số thành viên từ cao xuống thấp</b></span>
+            </div>
+            
+            <div class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fs-6" id="reachEstimateBadge">
+              Đã chọn: <b id="selectedGroupCountText">0</b> nhóm (~<b id="selectedMembersCountText">0</b> TV)
+            </div>
+          </div>
+
+          <!-- Các nút chọn lọc thông minh -->
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" onclick="selectTopGroups(5)">
+              <i class="fa-solid fa-star text-warning me-1"></i> Chọn 5 nhóm đông nhất
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" onclick="selectTopGroups(10)">
+              <i class="fa-solid fa-fire text-danger me-1"></i> Chọn 10 nhóm đông nhất
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5" onclick="selectAllGroups(true)">
+              Chọn tất cả
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5" onclick="selectAllGroups(false)">
+              Bỏ chọn
+            </button>
+          </div>
+
+          <!-- Danh sách nhóm dạng cuộn có checkbox -->
+          <div class="border rounded-3 overflow-hidden mb-3" style="max-height: 380px; overflow-y: auto;">
+            <table class="table table-hover align-middle mb-0" id="groupSelectTable">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th style="width: 40px;" class="text-center">
+                    <input class="form-check-input" type="checkbox" id="masterGroupCheckbox" onchange="selectAllGroups(this.checked)">
+                  </th>
+                  <th>Tên Hội Nhóm</th>
+                  <th style="width: 130px;" class="text-end pe-3">Số Thành Viên</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for g in groups %}
+                <tr class="group-select-row cursor-pointer" onclick="toggleGroupRowCheckbox('grp-{{ g.group_id }}')">
+                  <td class="text-center" onclick="event.stopPropagation()">
+                    <input class="form-check-input target-group-cb" 
+                           type="checkbox" 
+                           value="{{ g.group_id }}" 
+                           id="grp-{{ g.group_id }}"
+                           data-members="{{ g.members_count or 0 }}"
+                           data-name="{{ g.name }}"
+                           onchange="updateGroupSelectionStats()">
+                  </td>
+                  <td>
+                    <div class="fw-bold text-dark text-truncate" style="max-width: 280px;" title="{{ g.name }}">
+                      {{ g.name }}
+                    </div>
+                    <div class="text-muted small font-monospace" style="font-size: 0.75rem;">ID: {{ g.group_id }}</div>
+                  </td>
+                  <td class="text-end pe-3">
+                    <span class="badge bg-secondary-subtle text-dark fw-bold">
+                      <i class="fa-solid fa-user-group me-1 text-muted"></i>{{ "{:,}".format(g.members_count) if g.members_count else '---' }}
+                    </span>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="3" class="text-center py-4 text-muted">
+                    Chưa có nhóm nào. Vui lòng vào trang <b>Nhóm Facebook</b> để quét nhóm tự động!
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Nút Đăng lên Hội Nhóm -->
+          <button type="button" class="btn btn-primary w-100 py-2.5 rounded-pill fw-bold shadow-sm" id="btnPublishGroups" onclick="executeBatchGroupPublish()">
+            <i class="fa-solid fa-paper-plane me-1"></i> Bắt Đầu Đăng Vào Các Nhóm Đã Chọn
           </button>
-          <a href="/facebook/ai-write/{{ listing.id }}" class="btn btn-sm btn-outline-primary">
-            <i class="fa-solid fa-arrows-rotate me-1"></i> Tạo Lại Bài Khác
-          </a>
         </div>
-
-        <hr>
-
-        <h6 class="fw-bold mb-3"><i class="fa-brands fa-facebook text-primary me-2"></i>Chọn Tài Khoản & Nhóm Đăng:</h6>
-        
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Tài khoản đăng:</label>
-          <select name="account_id" class="form-select">
-            {% for acc in accounts %}
-            <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.uid }}) - {{ acc.status }}</option>
-            {% else %}
-            <option value="">Chưa có tài khoản Facebook nào</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Chọn nhóm đăng:</label>
-          <select name="group_id" class="form-select">
-            {% for g in groups %}
-            <option value="{{ g.group_id }}">{{ g.name }} ({{ g.members_count }} thành viên)</option>
-            {% else %}
-            <option value="">Chưa có nhóm nào</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
-          <i class="fa-solid fa-paper-plane me-1"></i> Đăng Lên Facebook Ngay
-        </button>
-      </form>
+      </div>
     </div>
   </div>
 
-  <div class="col-lg-5">
-    <div class="card border-0 shadow-sm rounded-4 p-4">
-      <h6 class="fw-bold mb-3"><i class="fa-solid fa-eye text-primary me-2"></i>Xem Trước Bài Viết</h6>
-      <div class="border rounded-4 p-3 bg-body-tertiary">
-        <div class="d-flex align-items-center gap-2 mb-3">
-          <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-            <i class="fa-brands fa-facebook-f"></i>
+  <!-- ================= TAB 2: ĐĂNG LÊN FACEBOOK MARKETPLACE ================= -->
+  <div class="tab-pane fade" id="tab-marketplace" role="tabpanel">
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 p-4 bg-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0 text-dark">
+              <i class="fa-solid fa-shop text-primary me-2"></i>Dữ Liệu Chuẩn Hóa Facebook Marketplace (AI Auto-Fill):
+            </h6>
+            <span class="badge bg-success-subtle text-success small">Chuẩn thuật toán niêm yết</span>
           </div>
-          <div>
-            <div class="fw-bold small">Tài Khoản Bất Động Sản</div>
-            <div class="text-muted" style="font-size: 0.75rem;">Vừa xong · <i class="fa-solid fa-earth-americas"></i></div>
+
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Tiêu đề niêm yết (Ngắn gọn, không viết hoa toàn bộ, không spam emoji) <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="text" id="mpTitle" class="form-control fw-bold" value="{{ marketplace_data.title }}">
+                <button class="btn btn-outline-secondary" type="button" onclick="copyInput('mpTitle')" title="Sao chép tiêu đề"><i class="fa-solid fa-copy"></i></button>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Giá bán niêm yết (VNĐ) <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="number" id="mpPrice" class="form-control font-monospace fw-bold text-danger" value="{{ marketplace_data.price_vnd }}">
+                <button class="btn btn-outline-secondary" type="button" onclick="copyInput('mpPrice')" title="Sao chép giá"><i class="fa-solid fa-copy"></i></button>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Hạng mục niêm yết</label>
+              <input type="text" class="form-control" value="Nhà đất / Bất động sản để bán" readonly>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Vị trí BĐS</label>
+              <div class="input-group">
+                <input type="text" id="mpLocation" class="form-control" value="{{ marketplace_data.location }}">
+                <button class="btn btn-outline-secondary" type="button" onclick="copyInput('mpLocation')" title="Sao chép vị trí"><i class="fa-solid fa-copy"></i></button>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Mô tả chi tiết chuẩn chính sách thương mại Facebook <span class="text-danger">*</span></label>
+              <div class="position-relative">
+                <textarea id="mpDescription" class="form-control font-monospace" rows="8" style="font-size: 0.9rem;">{{ marketplace_data.description }}</textarea>
+                <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2" type="button" onclick="copyInput('mpDescription')" title="Sao chép mô tả">
+                  <i class="fa-solid fa-copy me-1"></i> Copy
+                </button>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="d-flex flex-wrap gap-2 pt-2">
+                <button type="button" class="btn btn-gradient-primary rounded-pill px-4 fw-bold flex-grow-1 shadow-sm" onclick="publishMarketplaceDirect()">
+                  <i class="fa-solid fa-upload me-1"></i> Xuất Bản Lên Marketplace Ngay
+                </button>
+                <button type="button" class="btn btn-outline-info rounded-pill px-3" onclick="checkMarketplaceStatusModal()">
+                  <i class="fa-solid fa-rotate me-1"></i> Quét Trạng Thái Tin Đăng
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="small whitespace-pre-wrap" style="white-space: pre-wrap;" id="previewText">{{ ai_content }}</div>
-        {% if listing.image_url %}
-        <img src="{{ listing.image_url }}" class="img-fluid rounded-3 mt-3 w-100" style="max-height: 250px; object-fit: cover;">
-        {% endif %}
+      </div>
+
+      <!-- Xem trước giao diện Marketplace Card -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 p-4 bg-body">
+          <h6 class="fw-bold mb-3"><i class="fa-solid fa-mobile-screen text-primary me-2"></i>Mô Phỏng Thẻ Marketplace</h6>
+          
+          <div class="border rounded-4 overflow-hidden shadow-xs bg-body-tertiary">
+            <div style="height: 220px; background-color: #e2e8f0; position: relative;">
+              {% if listing.image_url %}
+              <img src="{{ listing.image_url }}" class="w-100 h-100 object-fit-cover" alt="{{ listing.title }}">
+              {% else %}
+              <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                <i class="fa-solid fa-image fs-1 opacity-25"></i>
+              </div>
+              {% endif %}
+              <span class="position-absolute top-0 start-0 m-2 badge bg-dark bg-opacity-75">Marketplace Preview</span>
+            </div>
+            
+            <div class="p-3">
+              <h5 class="fw-bold text-danger mb-1 font-monospace">{{ "{:,}".format(marketplace_data.price_vnd) }} ₫</h5>
+              <div class="fw-bold text-dark mb-1 text-truncate" id="previewMpTitle">{{ marketplace_data.title }}</div>
+              <div class="text-muted small mb-2"><i class="fa-solid fa-location-dot text-danger me-1"></i>{{ marketplace_data.location }}</div>
+              <hr class="my-2">
+              <div class="text-muted small" style="white-space: pre-line; max-height: 100px; overflow-y: auto;">
+                {{ marketplace_data.description }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TAB 3: BẢNG THEO DÕI LỊCH SỬ ĐĂNG CỦA RIÊNG BĐS NÀY ================= -->
+  <div class="tab-pane fade" id="tab-history" role="tabpanel">
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-body">
+      <div class="card-header bg-transparent border-bottom p-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-table-list text-primary me-2"></i>Bảng Lịch Sử Đăng Tin: {{ listing.title }}</h6>
+          <span class="text-muted small">Chi tiết các hội nhóm và kênh Facebook Marketplace đã xuất bản</span>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="refreshListingHistory()">
+          <i class="fa-solid fa-arrows-rotate me-1"></i> Làm mới lịch sử
+        </button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-4">Kênh Đăng</th>
+              <th>Tên Hội Nhóm / Kênh</th>
+              <th>Số Lượng Thành Viên</th>
+              <th>Trạng Thái</th>
+              <th>Thời Gian</th>
+              <th class="text-end pe-4">Liên Kết</th>
+            </tr>
+          </thead>
+          <tbody id="listingHistoryTableBody">
+            {% for log in listing_logs %}
+            <tr>
+              <td class="ps-4">
+                {% if log.post_channel == 'marketplace' %}
+                <span class="badge bg-primary text-white"><i class="fa-solid fa-shop me-1"></i>Marketplace</span>
+                {% else %}
+                <span class="badge bg-info-subtle text-info"><i class="fa-solid fa-users me-1"></i>Hội Nhóm</span>
+                {% endif %}
+              </td>
+              <td class="fw-bold">
+                {{ log.group_name or 'Hội Nhóm FB' }}
+                {% if log.group_id and log.group_id != 'marketplace' %}
+                <div class="text-muted small font-monospace" style="font-size: 0.75rem;">ID: {{ log.group_id }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-secondary-subtle text-secondary fw-semibold">
+                  {{ "{:,}".format(log.members_count) if log.members_count else '---' }} TV
+                </span>
+              </td>
+              <td>
+                {% if log.status == 'success' %}
+                <span class="badge bg-success-subtle text-success"><i class="fa-solid fa-check me-1"></i>Thành công</span>
+                {% elif log.status == 'pending' %}
+                <span class="badge bg-warning-subtle text-warning"><i class="fa-solid fa-clock me-1"></i>Chờ duyệt</span>
+                {% else %}
+                <span class="badge bg-danger-subtle text-danger"><i class="fa-solid fa-xmark me-1"></i>Từ chối</span>
+                {% endif %}
+              </td>
+              <td class="text-muted small">
+                {{ log.created_at.strftime('%d/%m/%Y %H:%M') if log.created_at else '---' }}
+              </td>
+              <td class="text-end pe-4">
+                {% if log.post_url %}
+                <a href="{{ log.post_url }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-2.5 py-1">
+                  Xem tin <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size: 0.72rem;"></i>
+                </a>
+                {% else %}
+                <span class="text-muted small">---</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                <i class="fa-solid fa-clock-rotate-left fs-1 d-block mb-3 opacity-25"></i>
+                Bất động sản này chưa có bài đăng nào. Hãy chọn nhóm hoặc đăng lên Marketplace ở các tab trên!
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </div>
+
+<!-- ================= MODAL: TIẾN TRÌNH XUẤT BẢN ĐA KÊNH ================= -->
+<div class="modal fade" id="batchPublishProgressModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-bottom bg-primary bg-opacity-10">
+        <h5 class="modal-title fw-bold text-primary">
+          <i class="fa-solid fa-paper-plane me-2"></i>Tiến Trình Đăng Bài BĐS & Chống Checkpoint
+        </h5>
+      </div>
+      <div class="modal-body p-4">
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-bold small text-primary" id="publishModalStatusText">Đang chuẩn bị xuất bản...</span>
+            <span class="badge bg-primary" id="publishModalPercent">0%</span>
+          </div>
+          <div class="progress" style="height: 10px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" id="publishModalBar" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="bg-dark text-light p-3 rounded-3 font-monospace small mb-3" style="max-height: 220px; overflow-y: auto;" id="publishModalTerminal">
+        </div>
+
+        <div id="publishCompleteAlert" class="alert alert-success d-none mb-0">
+          <i class="fa-solid fa-circle-check me-2 fs-5 align-middle"></i>
+          <span id="publishCompleteMsg">Đã đăng thành công toàn bộ bài viết vào các nhóm đã chọn!</span>
+        </div>
+      </div>
+      <div class="modal-footer border-top bg-light">
+        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal" id="publishModalCloseBtn" disabled onclick="window.location.reload()">
+          Đóng & Cập Nhật Lịch Sử
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: QUÉT & KIỂM TRA TRẠNG THÁI MARKETPLACE ================= -->
+<div class="modal fade" id="marketplaceStatusModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom bg-info bg-opacity-10">
+        <h5 class="modal-title fw-bold text-dark"><i class="fa-solid fa-shop text-primary me-2"></i>Trạng Thái Marketplace</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="mb-3">Cập nhật hoặc kiểm tra trạng thái tin niêm yết trên Facebook Marketplace cho BĐS này:</p>
+        
+        <div class="mb-3">
+          <label class="form-label fw-semibold small">Trạng thái hiện tại:</label>
+          <select id="mpStatusSelectModal" class="form-select">
+            <option value="active" {{ 'selected' if listing.marketplace_status == 'active' else '' }}>🟢 Đang hoạt động (Active)</option>
+            <option value="in_review" {{ 'selected' if listing.marketplace_status == 'in_review' else '' }}>🟡 Đang chờ xét duyệt (In Review)</option>
+            <option value="expired" {{ 'selected' if listing.marketplace_status == 'expired' else '' }}>🔴 Đã hết hạn (Expired)</option>
+            <option value="renewal_needed" {{ 'selected' if listing.marketplace_status == 'renewal_needed' else '' }}>🟠 Cần gia hạn tin đăng (Needs Renewal)</option>
+            <option value="not_posted" {{ 'selected' if listing.marketplace_status == 'not_posted' else '' }}>⚪ Chưa đăng Marketplace</option>
+          </select>
+        </div>
+
+        <div class="alert alert-info small mb-0">
+          <i class="fa-solid fa-info-circle me-1"></i> Tin niêm yết BĐS trên Marketplace thường có chu kỳ 7 ngày. Bạn có thể gia hạn (Renew) để tin luôn hiển thị ở top đầu kết quả tìm kiếm của khách hàng.
+        </div>
+      </div>
+      <div class="modal-footer border-top bg-light">
+        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Đóng</button>
+        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="saveMarketplaceStatus()">
+          Lưu Trạng Thái
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .cursor-pointer { cursor: pointer; }
+  .group-select-row.selected-group-tr {
+    background-color: rgba(13, 110, 253, 0.08) !important;
+  }
+</style>
+
+<script>
+  const CURRENT_LISTING_ID = {{ listing.id }};
+
+  // Toggle selection on row click
+  function toggleGroupRowCheckbox(cbId) {
+    const cb = document.getElementById(cbId);
+    if (cb) {
+      cb.checked = !cb.checked;
+      updateGroupSelectionStats();
+    }
+  }
+
+  // Update statistics (groups count, estimated members reach)
+  function updateGroupSelectionStats() {
+    const checkboxes = document.querySelectorAll('.target-group-cb');
+    let selectedCount = 0;
+    let totalMembers = 0;
+
+    checkboxes.forEach(cb => {
+      const row = cb.closest('tr');
+      if (cb.checked) {
+        selectedCount++;
+        totalMembers += parseInt(cb.getAttribute('data-members')) || 0;
+        if (row) row.classList.add('selected-group-tr');
+      } else {
+        if (row) row.classList.remove('selected-group-tr');
+      }
+    });
+
+    document.getElementById('selectedGroupCountText').textContent = selectedCount;
+    document.getElementById('selectedMembersCountText').textContent = totalMembers.toLocaleString('vi-VN');
+
+    const masterCb = document.getElementById('masterGroupCheckbox');
+    if (masterCb) {
+      masterCb.checked = (checkboxes.length > 0 && selectedCount === checkboxes.length);
+      masterCb.indeterminate = (selectedCount > 0 && selectedCount < checkboxes.length);
+    }
+  }
+
+  // Select all or deselect all
+  function selectAllGroups(isChecked) {
+    document.querySelectorAll('.target-group-cb').forEach(cb => {
+      cb.checked = isChecked;
+    });
+    updateGroupSelectionStats();
+  }
+
+  // Select top N groups by members count (sorted descending in DOM)
+  function selectTopGroups(limit) {
+    selectAllGroups(false);
+    const checkboxes = Array.from(document.querySelectorAll('.target-group-cb'));
+    for (let i = 0; i < Math.min(limit, checkboxes.length); i++) {
+      checkboxes[i].checked = true;
+    }
+    updateGroupSelectionStats();
+  }
+
+  function copyInput(elId) {
+    const el = document.getElementById(elId);
+    if (el) {
+      navigator.clipboard.writeText(el.value);
+      alert('Đã sao chép nội dung vào bộ nhớ tạm!');
+    }
+  }
+
+  // Helper log in modal terminal
+  function appendPublishLog(msg, colorClass = 'text-light') {
+    const term = document.getElementById('publishModalTerminal');
+    const d = document.createElement('div');
+    d.className = colorClass + ' mb-1';
+    d.textContent = msg;
+    term.appendChild(d);
+    term.scrollTop = term.scrollHeight;
+  }
+
+  // Execute Batch Group Publishing
+  async function executeBatchGroupPublish() {
+    const checkedCbs = Array.from(document.querySelectorAll('.target-group-cb:checked'));
+    if (checkedCbs.length === 0) {
+      return alert('Vui lòng chọn ít nhất một hội nhóm để đăng bài!');
+    }
+
+    const groupIds = checkedCbs.map(cb => cb.value);
+    const content = document.getElementById('groupPostContent').value.trim();
+    const accountId = document.getElementById('selectedAccountSelect').value;
+    const delayVal = parseFloat(document.getElementById('groupPostDelaySelect').value) || 30.0;
+    const useSpintax = document.getElementById('enableSpintaxCheck').checked;
+
+    if (!content) {
+      return alert('Nội dung bài viết không được để trống!');
+    }
+
+    // Open progress modal
+    const modal = new bootstrap.Modal(document.getElementById('batchPublishProgressModal'));
+    modal.show();
+
+    const bar = document.getElementById('publishModalBar');
+    const percentEl = document.getElementById('publishModalPercent');
+    const statusText = document.getElementById('publishModalStatusText');
+    const closeBtn = document.getElementById('publishModalCloseBtn');
+    const completeAlert = document.getElementById('publishCompleteAlert');
+    const term = document.getElementById('publishModalTerminal');
+
+    term.innerHTML = '';
+    completeAlert.classList.add('d-none');
+    closeBtn.disabled = true;
+    bar.style.width = '15%';
+    percentEl.textContent = '15%';
+    statusText.textContent = 'Đang kết nối Facebook & chuẩn bị nội dung...';
+
+    appendPublishLog(`[Khởi động] Bắt đầu đăng ${groupIds.length} nhóm được chọn lọc (Top thành viên đông nhất)...`);
+    if (useSpintax) {
+      appendPublishLog(`[Bảo vệ FB] Đã kích hoạt Spintax AI chống lỗi trùng lặp nội dung của Facebook.`, 'text-warning');
+    }
+
+    try {
+      const res = await fetch('/facebook/publish-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: CURRENT_LISTING_ID,
+          account_id: accountId,
+          channels: ['groups'],
+          group_ids: groupIds,
+          content: content,
+          delay: delayVal,
+          use_spintax: useSpintax
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        bar.style.width = '100%';
+        percentEl.textContent = '100%';
+        bar.classList.remove('bg-primary');
+        bar.classList.add('bg-success');
+        statusText.textContent = '✅ Đã hoàn tất đăng bài lên toàn bộ nhóm!';
+
+        if (Array.isArray(data.logs)) {
+          term.innerHTML = '';
+          data.logs.forEach(l => {
+            const isRest = l.includes('nghỉ') || l.includes('⏸️');
+            const isDone = l.includes('Hoàn tất') || l.includes('Thành công');
+            appendPublishLog(l, isDone ? 'text-success fw-bold' : (isRest ? 'text-warning' : 'text-light'));
+          });
+        }
+
+        completeAlert.classList.remove('d-none');
+        document.getElementById('publishCompleteMsg').textContent = 
+          `Đã đăng thành công lên ${data.posted_count} hội nhóm Facebook! Dữ liệu đã lưu vào lịch sử.`;
+        closeBtn.disabled = false;
+      } else {
+        throw new Error(data.message || 'Lỗi khi xuất bản bài đăng');
+      }
+    } catch (e) {
+      console.error(e);
+      appendPublishLog(`[LỖI] ${e.message}`, 'text-danger fw-bold');
+      statusText.textContent = '⚠️ Có lỗi trong quá trình xuất bản';
+      bar.classList.add('bg-danger');
+      closeBtn.disabled = false;
+    }
+  }
+
+  // Publish to Marketplace
+  async function publishMarketplaceDirect() {
+    const title = document.getElementById('mpTitle').value.trim();
+    const price = document.getElementById('mpPrice').value;
+    const location = document.getElementById('mpLocation').value.trim();
+    const desc = document.getElementById('mpDescription').value.trim();
+    const accountId = document.getElementById('selectedAccountSelect').value;
+
+    if (!confirm('Bạn có chắc muốn xuất bản tin BĐS này lên Facebook Marketplace qua Profile Facebook đang kết nối?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/facebook/publish-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: CURRENT_LISTING_ID,
+          account_id: accountId,
+          channels: ['marketplace'],
+          post_marketplace: true,
+          marketplace_title: title,
+          marketplace_price: price,
+          marketplace_description: desc
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert('Đã xuất bản tin rao lên Facebook Marketplace thành công! Hệ thống đã lưu lịch sử.');
+        window.location.reload();
+      } else {
+        alert(data.message || 'Lỗi xuất bản Marketplace');
+      }
+    } catch (e) {
+      alert('Lỗi kết nối: ' + e.message);
+    }
+  }
+
+  // Open Marketplace Status Modal
+  function checkMarketplaceStatusModal() {
+    new bootstrap.Modal(document.getElementById('marketplaceStatusModal')).show();
+  }
+
+  // Save Marketplace status
+  async function saveMarketplaceStatus() {
+    const st = document.getElementById('mpStatusSelectModal').value;
+    try {
+      const res = await fetch(`/facebook/marketplace/check-status/${CURRENT_LISTING_ID}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: st })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Đã cập nhật trạng thái Marketplace: ' + data.label);
+        window.location.reload();
+      }
+    } catch (e) {
+      alert('Lỗi kết nối: ' + e.message);
+    }
+  }
+
+  // Refresh Listing History Table
+  async function refreshListingHistory() {
+    try {
+      const res = await fetch(`/facebook/listings/${CURRENT_LISTING_ID}/history`);
+      const data = await res.json();
+      if (data.success) {
+        const tbody = document.getElementById('listingHistoryTableBody');
+        tbody.innerHTML = '';
+        
+        const logs = [];
+        if (data.marketplace_post) logs.push(data.marketplace_post);
+        if (Array.isArray(data.group_posts)) logs.push(...data.group_posts);
+
+        if (logs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">Chưa có bài đăng nào cho BĐS này.</td></tr>`;
+          return;
+        }
+
+        logs.forEach(l => {
+          const isMp = l.channel === 'marketplace';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="ps-4">
+              <span class="badge ${isMp ? 'bg-primary text-white' : 'bg-info-subtle text-info'}">
+                <i class="fa-solid ${isMp ? 'fa-shop' : 'fa-users'} me-1"></i>${isMp ? 'Marketplace' : 'Hội Nhóm'}
+              </span>
+            </td>
+            <td class="fw-bold">
+              ${l.group_name}
+              ${l.group_id && l.group_id !== 'marketplace' ? `<div class="text-muted small font-monospace" style="font-size: 0.75rem;">ID: ${l.group_id}</div>` : ''}
+            </td>
+            <td>
+              <span class="badge bg-secondary-subtle text-secondary fw-semibold">
+                ${(l.members_count || 0).toLocaleString('vi-VN')} TV
+              </span>
+            </td>
+            <td>
+              <span class="badge ${l.status === 'success' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">
+                ${l.status === 'success' ? 'Thành công' : 'Chờ duyệt'}
+              </span>
+            </td>
+            <td class="text-muted small">${l.created_at}</td>
+            <td class="text-end pe-4">
+              ${l.post_url ? `<a href="${l.post_url}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-2.5 py-1">Xem tin <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size: 0.72rem;"></i></a>` : '---'}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        document.getElementById('historyTabCount').textContent = logs.length;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // Default: Select Top 5 Groups on page load if available
+  document.addEventListener('DOMContentLoaded', () => {
+    selectTopGroups(5);
+  });
+</script>
 {% endblock %}

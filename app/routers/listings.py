@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Listing
+from app.models import Listing, PostLog
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -12,6 +12,11 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/")
 def list_listings(request: Request, db: Session = Depends(get_db)):
     listings = db.query(Listing).order_by(Listing.id.desc()).all()
+    # Gắn kèm số lượng bài đã đăng cho từng căn BĐS
+    for item in listings:
+        item.group_posts_count = db.query(PostLog).filter(PostLog.listing_id == item.id, PostLog.post_channel == 'group').count()
+        item.has_marketplace = db.query(PostLog).filter(PostLog.listing_id == item.id, PostLog.post_channel == 'marketplace').count() > 0
+    
     return templates.TemplateResponse(
         request=request,
         name="listings.html",

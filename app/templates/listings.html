@@ -4,7 +4,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
   <div>
     <h4 class="fw-bold mb-1"><i class="fa-solid fa-house-chimney text-primary me-2"></i>Kho Bất Động Sản</h4>
-    <p class="text-muted mb-0 small">Quản lý toàn bộ danh mục sản phẩm nhà đất, căn hộ và thao tác hàng loạt.</p>
+    <p class="text-muted mb-0 small">Quản lý toàn bộ danh mục sản phẩm nhà đất, theo dõi lịch sử đăng từng nhóm & Marketplace.</p>
   </div>
   <div class="d-flex align-items-center gap-2">
     <!-- View Switcher -->
@@ -30,13 +30,13 @@
       <div class="col-lg-5 col-md-6">
         <div class="input-group">
           <span class="input-group-text bg-transparent border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-          <input type="text" id="listingSearchInput" class="form-control border-start-0" placeholder="Tìm theo tiêu đề, địa chỉ..." onkeyup="filterListings()">
+          <input type="text" id="listingSearchInput" class="form-control border-start-0" placeholder="Tìm theo tiêu đề, vị trí BĐS..." onkeyup="filterListings()">
         </div>
       </div>
       
       <div class="col-lg-4 col-md-6">
         <select id="statusFilter" class="form-select" onchange="filterListings()">
-          <option value="all">Tất cả trạng thái</option>
+          <option value="all">Tất cả trạng thái kho</option>
           <option value="available">🟢 Đang bán</option>
           <option value="reserved">🟡 Đã đặt cọc</option>
           <option value="sold">🟣 Đã chốt bán</option>
@@ -105,11 +105,12 @@
               <input class="form-check-input" type="checkbox" id="masterCheckbox" onchange="toggleSelectAll(this.checked)" title="Chọn / Bỏ chọn tất cả">
             </div>
           </th>
-          <th style="min-width: 280px;">Bất Động Sản</th>
-          <th style="width: 140px;">Giá Bán</th>
-          <th style="width: 130px;">Diện Tích</th>
-          <th style="width: 150px;">Trạng Thái</th>
-          <th style="width: 150px;" class="text-end pe-3">Thao Tác</th>
+          <th style="min-width: 260px;">Bất Động Sản</th>
+          <th style="width: 120px;">Giá Bán</th>
+          <th style="width: 110px;">Diện Tích</th>
+          <th style="width: 130px;">Trạng Thái Kho</th>
+          <th style="width: 190px;">Kênh Xuất Bản / Lịch Sử</th>
+          <th style="width: 160px;" class="text-end pe-3">Hành Động</th>
         </tr>
       </thead>
       <tbody>
@@ -140,7 +141,7 @@
               </div>
               <div class="overflow-hidden">
                 <a href="/facebook/ai-write/{{ item.id }}" class="fw-bold text-decoration-none text-body text-truncate d-block mb-1" title="{{ item.title }}">{{ item.title }}</a>
-                <div class="text-muted small text-truncate" style="max-width: 320px;"><i class="fa-solid fa-location-dot text-danger me-1"></i>{{ item.location }}</div>
+                <div class="text-muted small text-truncate" style="max-width: 280px;"><i class="fa-solid fa-location-dot text-danger me-1"></i>{{ item.location }}</div>
               </div>
             </div>
           </td>
@@ -167,12 +168,33 @@
               </ul>
             </div>
           </td>
+          <!-- Kênh Xuất Bản & Lịch Sử Từng BĐS -->
+          <td>
+            <div class="d-flex flex-column gap-1">
+              <div>
+                {% if item.marketplace_status == 'active' %}
+                <span class="badge bg-success text-white" style="font-size: 0.72rem;"><i class="fa-solid fa-shop me-1"></i>Marketplace: Live</span>
+                {% elif item.marketplace_status == 'in_review' %}
+                <span class="badge bg-warning text-dark" style="font-size: 0.72rem;"><i class="fa-solid fa-shop me-1"></i>MP: Chờ duyệt</span>
+                {% elif item.marketplace_status == 'expired' %}
+                <span class="badge bg-danger text-white" style="font-size: 0.72rem;"><i class="fa-solid fa-shop me-1"></i>MP: Hết hạn</span>
+                {% else %}
+                <span class="badge bg-light text-muted border" style="font-size: 0.72rem;"><i class="fa-solid fa-shop me-1"></i>Chưa đăng MP</span>
+                {% endif %}
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-0.5 text-start d-inline-flex align-items-center gap-1" style="font-size: 0.75rem;" onclick="openListingHistoryModal({{ item.id }}, '{{ item.title|replace("'", "\\'") }}')">
+                <i class="fa-solid fa-clock-rotate-left text-info"></i>
+                <span><b>{{ item.group_posts_count or 0 }}</b> nhóm đã đăng</span>
+              </button>
+            </div>
+          </td>
+          <!-- Thao Tác -->
           <td class="text-end pe-3">
             <div class="d-inline-flex gap-1">
-              <a href="/facebook/ai-write/{{ item.id }}" class="btn btn-sm btn-outline-success rounded-pill px-2.5" title="AI Viết Bài">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
+              <a href="/facebook/ai-write/{{ item.id }}" class="btn btn-sm btn-success rounded-pill px-3 shadow-xs fw-semibold" title="Soạn & Đăng Tin">
+                <i class="fa-solid fa-paper-plane me-1"></i> Đăng Tin
               </a>
-              <a href="/listings/delete/{{ item.id }}" class="btn btn-sm btn-outline-danger rounded-pill px-2.5" onclick="return confirm('Bạn có chắc muốn xóa BĐS này?')">
+              <a href="/listings/delete/{{ item.id }}" class="btn btn-sm btn-outline-danger rounded-pill px-2" onclick="return confirm('Bạn có chắc muốn xóa BĐS này?')" title="Xóa">
                 <i class="fa-solid fa-trash"></i>
               </a>
             </div>
@@ -180,7 +202,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="text-center py-5 text-muted">
+          <td colspan="7" class="text-center py-5 text-muted">
             <i class="fa-solid fa-house-chimney-crack fs-1 opacity-25 mb-3 d-block"></i>
             <h6>Chưa có bất động sản nào trong kho</h6>
           </td>
@@ -225,11 +247,22 @@
         </div>
         <h5 class="card-title fw-bold text-truncate" title="{{ item.title }}">{{ item.title }}</h5>
         <p class="card-text text-muted small mb-2"><i class="fa-solid fa-location-dot me-1 text-danger"></i>{{ item.location }}</p>
-        <p class="card-text text-muted small text-truncate-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ item.description }}</p>
+
+        <!-- Kênh đăng tin -->
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          {% if item.marketplace_status == 'active' %}
+          <span class="badge bg-success"><i class="fa-solid fa-shop me-1"></i>Marketplace: Live</span>
+          {% else %}
+          <span class="badge bg-light text-muted border"><i class="fa-solid fa-shop me-1"></i>Chưa đăng MP</span>
+          {% endif %}
+          <button type="button" class="btn btn-sm btn-outline-info rounded-pill px-2 py-0" style="font-size: 0.72rem;" onclick="openListingHistoryModal({{ item.id }}, '{{ item.title|replace("'", "\\'") }}')">
+            <i class="fa-solid fa-clock-rotate-left me-1"></i>{{ item.group_posts_count or 0 }} nhóm đã đăng
+          </button>
+        </div>
       </div>
       <div class="card-footer bg-transparent border-0 d-flex justify-content-between align-items-center pt-0 pb-3">
-        <a href="/facebook/ai-write/{{ item.id }}" class="btn btn-sm btn-outline-success">
-          <i class="fa-solid fa-wand-magic-sparkles me-1"></i> AI Viết Bài
+        <a href="/facebook/ai-write/{{ item.id }}" class="btn btn-sm btn-success rounded-pill px-3 fw-bold">
+          <i class="fa-solid fa-paper-plane me-1"></i> Đăng Tin Đa Kênh
         </a>
         <a href="/listings/delete/{{ item.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bạn có chắc muốn xóa BĐS này?')">
           <i class="fa-solid fa-trash"></i>
@@ -238,6 +271,71 @@
     </div>
   </div>
   {% endfor %}
+</div>
+
+<!-- ================= MODAL: THEO DÕI LỊCH SỬ ĐĂNG CỦA TỪNG BẤT ĐỘNG SẢN ================= -->
+<div class="modal fade" id="listingHistoryModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-bottom bg-info bg-opacity-10">
+        <div>
+          <h5 class="modal-title fw-bold text-dark">
+            <i class="fa-solid fa-clock-rotate-left text-info me-2"></i>Lịch Sử Đăng Tin Chi Tiết
+          </h5>
+          <span class="text-muted small" id="modalListingTitleDisplay">Bất động sản</span>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body p-4">
+        <!-- Marketplace Status Box -->
+        <div class="card bg-light border p-3 rounded-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-shop text-primary fs-4"></i>
+              <div>
+                <div class="fw-bold">Facebook Marketplace</div>
+                <div class="small text-muted" id="modalMpStatusDetail">Trạng thái: Đang tải...</div>
+              </div>
+            </div>
+            <a href="https://www.facebook.com/marketplace/you/selling" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+              Mở Marketplace <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size: 0.72rem;"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- Bảng danh sách các nhóm đã đăng kèm số lượng thành viên -->
+        <h6 class="fw-bold mb-2 text-dark"><i class="fa-solid fa-users text-primary me-2"></i>Danh Sách Các Hội Nhóm Đã Đăng:</h6>
+        <div class="border rounded-3 overflow-hidden">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Tên Hội Nhóm Facebook</th>
+                <th style="width: 140px;">Số Lượng Thành Viên</th>
+                <th style="width: 120px;">Trạng Thái</th>
+                <th style="width: 130px;">Thời Gian</th>
+                <th style="width: 90px;" class="text-end pe-3">Xem Tin</th>
+              </tr>
+            </thead>
+            <tbody id="modalHistoryTableBody">
+              <tr>
+                <td colspan="5" class="text-center py-4 text-muted">
+                  <div class="spinner-border spinner-border-sm text-primary me-2"></div> Đang tải lịch sử đăng tin...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer border-top bg-light">
+        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Đóng</button>
+        <a href="#" id="modalGoToAiWriteBtn" class="btn btn-primary rounded-pill px-4 fw-bold">
+          <i class="fa-solid fa-paper-plane me-1"></i> Đăng Thêm Nhóm Mới
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: Xóa Hàng Loạt -->
@@ -316,12 +414,6 @@
     </div>
   </div>
 </div>
-
-<style>
-  .listing-row.selected-row {
-    background-color: rgba(37, 99, 235, 0.08) !important;
-  }
-</style>
 
 <script>
   let selectedIds = new Set();
@@ -511,6 +603,72 @@
       }
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  // ================= VIEW LISTING HISTORY MODAL ================= //
+  async function openListingHistoryModal(listingId, listingTitle) {
+    document.getElementById('modalListingTitleDisplay').textContent = listingTitle;
+    document.getElementById('modalGoToAiWriteBtn').href = '/facebook/ai-write/' + listingId;
+    
+    const tbody = document.getElementById('modalHistoryTableBody');
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div> Đang tải lịch sử đăng bài...</td></tr>`;
+
+    const modal = new bootstrap.Modal(document.getElementById('listingHistoryModal'));
+    modal.show();
+
+    try {
+      const res = await fetch(`/facebook/listings/${listingId}/history`);
+      const data = await res.json();
+      if (data.success) {
+        // Marketplace detail
+        const mpStatus = data.listing.marketplace_status || 'not_posted';
+        const mpLabels = {
+          'active': '🟢 Đang hiển thị hoạt động (Active)',
+          'in_review': '🟡 Đang chờ xét duyệt (In Review)',
+          'expired': '🔴 Đã hết hạn (Expired)',
+          'renewal_needed': '🟠 Cần gia hạn tin đăng (Needs Renewal)',
+          'not_posted': '⚪ Chưa xuất bản lên Marketplace'
+        };
+        document.getElementById('modalMpStatusDetail').textContent = 'Trạng thái: ' + (mpLabels[mpStatus] || mpStatus);
+
+        // Group posts list with exact members count
+        const groups = data.group_posts || [];
+        if (groups.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted"><i class="fa-solid fa-circle-info me-1"></i> Chưa có bài đăng nào lên Hội Nhóm cho BĐS này.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = '';
+        groups.forEach(g => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="ps-3 fw-bold">
+              ${g.group_name}
+              ${g.group_id ? `<div class="text-muted small font-monospace" style="font-size: 0.72rem;">ID: ${g.group_id}</div>` : ''}
+            </td>
+            <td>
+              <span class="badge bg-secondary-subtle text-dark fw-bold">
+                <i class="fa-solid fa-users me-1 text-muted"></i>${(g.members_count || 0).toLocaleString('vi-VN')} TV
+              </span>
+            </td>
+            <td>
+              <span class="badge ${g.status === 'success' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">
+                ${g.status === 'success' ? 'Thành công' : 'Chờ duyệt'}
+              </span>
+            </td>
+            <td class="text-muted small">${g.created_at}</td>
+            <td class="text-end pe-3">
+              ${g.post_url ? `<a href="${g.post_url}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-2.5 py-0.5" style="font-size: 0.75rem;">Xem tin <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size: 0.7rem;"></i></a>` : '---'}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger">Không thể tải lịch sử: ${data.message}</td></tr>`;
+      }
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger">Lỗi kết nối máy chủ: ${e.message}</td></tr>`;
     }
   }
 </script>

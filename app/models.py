@@ -13,6 +13,9 @@ class Listing(Base):
     image_url = Column(String(500), nullable=True, default="")
     contact = Column(String(100), nullable=True, default="")
     status = Column(String(50), default="available")
+    marketplace_status = Column(String(50), default="not_posted") # not_posted, active, in_review, expired, renewal_needed
+    marketplace_url = Column(String(500), nullable=True)
+    marketplace_posted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class FacebookAccount(Base):
@@ -37,12 +40,15 @@ class FacebookGroup(Base):
 class PostLog(Base):
     __tablename__ = "post_logs"
     id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, nullable=True, index=True)
+    listing_title = Column(String(255), nullable=True)
+    post_channel = Column(String(50), default="group") # group, marketplace
     account_name = Column(String(100), nullable=True)
     account_uid = Column(String(50), nullable=True)
     group_name = Column(String(255), nullable=True)
     group_id = Column(String(50), nullable=True)
-    listing_title = Column(String(255), nullable=True)
-    status = Column(String(50), default="success") # success, failed, pending
+    members_count = Column(Integer, default=0)
+    status = Column(String(50), default="success") # success, pending, failed, rejected
     message = Column(Text, nullable=True)
     post_url = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

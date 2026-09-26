@@ -28,10 +28,14 @@ def run_migrations():
                 existing_cols = [c["name"] for c in inspector.get_columns("listings")]
                 if "status" not in existing_cols:
                     conn.execute(text("ALTER TABLE listings ADD COLUMN status VARCHAR(50) DEFAULT 'available'"))
-                    print("[Migration] Đã tự động bổ sung cột 'status' vào bảng listings.")
                 if "contact" not in existing_cols:
                     conn.execute(text("ALTER TABLE listings ADD COLUMN contact VARCHAR(100) DEFAULT ''"))
-                    print("[Migration] Đã tự động bổ sung cột 'contact' vào bảng listings.")
+                if "marketplace_status" not in existing_cols:
+                    conn.execute(text("ALTER TABLE listings ADD COLUMN marketplace_status VARCHAR(50) DEFAULT 'not_posted'"))
+                if "marketplace_url" not in existing_cols:
+                    conn.execute(text("ALTER TABLE listings ADD COLUMN marketplace_url VARCHAR(500) DEFAULT ''"))
+                if "marketplace_posted_at" not in existing_cols:
+                    conn.execute(text("ALTER TABLE listings ADD COLUMN marketplace_posted_at DATETIME"))
                 conn.commit()
 
             # 2. Bảng fb_accounts
@@ -40,6 +44,17 @@ def run_migrations():
                 if "status" not in acc_cols:
                     conn.execute(text("ALTER TABLE fb_accounts ADD COLUMN status VARCHAR(50) DEFAULT 'Live'"))
                     conn.commit()
+
+            # 3. Bảng post_logs
+            if "post_logs" in table_names:
+                log_cols = [c["name"] for c in inspector.get_columns("post_logs")]
+                if "listing_id" not in log_cols:
+                    conn.execute(text("ALTER TABLE post_logs ADD COLUMN listing_id INTEGER"))
+                if "post_channel" not in log_cols:
+                    conn.execute(text("ALTER TABLE post_logs ADD COLUMN post_channel VARCHAR(50) DEFAULT 'group'"))
+                if "members_count" not in log_cols:
+                    conn.execute(text("ALTER TABLE post_logs ADD COLUMN members_count INTEGER DEFAULT 0"))
+                conn.commit()
     except Exception as e:
         print(f"[Migration Warning] {e}")
 
