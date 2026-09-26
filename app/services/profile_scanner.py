@@ -717,100 +717,100 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
         time.sleep(0.5)
 
     # 3. Kịch bản JavaScript tự động tìm khung soạn thảo, điền nội dung và bấm Đăng
-    js_post_script = f"""
-    (async () => {{
-        const postContent = {json.dumps(content)};
-        const targetUrl = {json.dumps(target_group_url)};
+    js_template = """
+    (async () => {
+        const postContent = %%POST_CONTENT%%;
+        const targetUrl = %%TARGET_URL%%;
         const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 
         // Hàm click mô phỏng toàn diện sự kiện chuột và con trỏ cho React/Facebook
-        const triggerClick = (el) => {{
+        const triggerClick = (el) => {
             if (!el) return;
-            el.scrollIntoView({{ behavior: 'instant', block: 'center' }});
+            el.scrollIntoView({ behavior: 'instant', block: 'center' });
             const rect = el.getBoundingClientRect();
             const cx = rect.left + rect.width / 2;
             const cy = rect.top + rect.height / 2;
-            const mouseOpts = {{ bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }};
+            const mouseOpts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
             el.dispatchEvent(new PointerEvent('pointerdown', mouseOpts));
             el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
             el.focus();
             el.dispatchEvent(new PointerEvent('pointerup', mouseOpts));
             el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
             el.click();
-        }};
+        };
 
         // 0. Nếu trang bị trôi vào /edit hoặc trang cài đặt nhóm, đưa ngay về trang chủ nhóm
-        if (window.location.href.includes('/edit') || window.location.href.includes('/settings')) {{
+        if (window.location.href.includes('/edit') || window.location.href.includes('/settings')) {
             window.location.href = targetUrl;
-            return JSON.stringify({{
+            return JSON.stringify({
                 success: false,
                 step: "redirect_from_edit",
                 message: "Trình duyệt đang ở trang chỉnh sửa nhóm (/edit). Hệ thống đã tự động đưa về trang thảo luận chính, vui lòng nhấn Đăng lại."
-            }});
-        }}
+            });
+        }
 
         // 1. Kiểm tra xem hộp thoại soạn bài (div[role="dialog"]) đã mở sẵn chưa
         let dialog = document.querySelector('div[role="dialog"]');
         
-        if (!dialog) {{
+        if (!dialog) {
             // Cuộn xuống qua phần ảnh bìa nhóm để Facebook mount khung GroupInlineComposer vào DOM
             window.scrollTo(0, 380);
             await sleep(500);
 
             // BỘ LỌC CHỐNG CLICK NHẦM: Không bao giờ click vào nút Chỉnh sửa bìa / Cài đặt nhóm / Quản trị
-            const isForbiddenElement = (el) => {{
+            const isForbiddenElement = (el) => {
                 if (!el) return true;
                 const href = (el.getAttribute('href') || (el.closest('a') ? el.closest('a').getAttribute('href') : '') || '').toLowerCase();
-                if (href.includes('/edit') || href.includes('/settings') || href.includes('/about') || href.includes('/members')) {{
+                if (href.includes('/edit') || href.includes('/settings') || href.includes('/about') || href.includes('/members')) {
                     return true;
-                }}
+                }
                 const al = (el.getAttribute('aria-label') || '').toLowerCase();
                 const txt = (el.innerText || el.textContent || '').toLowerCase().trim();
                 const forbiddenWords = ['chỉnh sửa', 'edit', 'ảnh bìa', 'cover photo', 'cài đặt', 'settings', 'quản lý', 'manage', 'thành viên', 'members', 'giới thiệu', 'about'];
-                if (forbiddenWords.some(fw => al.includes(fw) || (txt === fw))) {{
+                if (forbiddenWords.some(fw => al.includes(fw) || (txt === fw))) {
                     return true;
-                }}
+                }
                 // Bỏ qua nếu nằm trong header hoặc ảnh bìa
-                if (el.closest('header') || el.closest('[data-pagelet*="Cover"]') || el.closest('[data-pagelet*="Header"]')) {{
+                if (el.closest('header') || el.closest('[data-pagelet*="Cover"]') || el.closest('[data-pagelet*="Header"]')) {
                     return true;
-                }}
+                }
                 return false;
-            }};
+            };
 
             let triggerEl = null;
 
             // Cách 1: Tìm GroupInlineComposer của Facebook
             const composerPagelet = document.querySelector('div[data-pagelet="GroupInlineComposer"]');
-            if (composerPagelet) {{
+            if (composerPagelet) {
                 // Ưu tiên 1.1: Hộp văn bản giả lập "Bạn viết gì đi..."
                 const mainBtn = composerPagelet.querySelector('div[role="button"][tabindex="0"], div[role="button"]:not([aria-label*="Ảnh"]):not([aria-label*="Photo"]):not([aria-label*="video"])');
-                if (mainBtn && !isForbiddenElement(mainBtn)) {{
+                if (mainBtn && !isForbiddenElement(mainBtn)) {
                     triggerEl = mainBtn;
-                }}
+                }
                 
                 // Ưu tiên 1.2: Nếu là nhóm Mua Bán (Buy/Sell) có nút "Thảo luận"
-                if (!triggerEl) {{
+                if (!triggerEl) {
                     const buttons = Array.from(composerPagelet.querySelectorAll('div[role="button"], span, div[tabindex="0"]'));
-                    for (const b of buttons) {{
+                    for (const b of buttons) {
                         const t = (b.innerText || b.getAttribute('aria-label') || '').toLowerCase().trim();
-                        if ((t.includes('thảo luận') || t.includes('discussion') || t.includes('bạn viết gì đi')) && !isForbiddenElement(b)) {{
+                        if ((t.includes('thảo luận') || t.includes('discussion') || t.includes('bạn viết gì đi')) && !isForbiddenElement(b)) {
                             triggerEl = b;
                             break;
-                        }}
-                    }}
-                }}
+                        }
+                    }
+                }
 
                 // Ưu tiên 1.3: Nhấp vào nút "Ảnh/video" trong GroupInlineComposer (Nút này 100% kích hoạt mở dialog tạo bài)
-                if (!triggerEl) {{
+                if (!triggerEl) {
                     const mediaBtn = composerPagelet.querySelector('div[aria-label*="Ảnh"], div[aria-label*="Photo"], div[aria-label*="video"]');
-                    if (mediaBtn && !isForbiddenElement(mediaBtn)) {{
+                    if (mediaBtn && !isForbiddenElement(mediaBtn)) {
                         triggerEl = mediaBtn;
-                    }}
-                }}
-            }}
+                    }
+                }
+            }
 
             // Cách 2: Tìm nút "Tạo bài viết" / "Bạn viết gì đi..." trong phần feed chính
-            if (!triggerEl) {{
+            if (!triggerEl) {
                 const promptKeywords = [
                     "bạn viết gì đi", "write something", "tạo bài viết", 
                     "tạo bài viết công khai", "create a public post", "create post", 
@@ -818,167 +818,237 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
                 ];
                 const feedArea = document.querySelector('div[role="feed"], div[role="main"]') || document.body;
                 const buttons = Array.from(feedArea.querySelectorAll('div[role="button"], div[tabindex="0"]'));
-                for (const b of buttons) {{
+                for (const b of buttons) {
                     if (isForbiddenElement(b)) continue;
                     const txt = (b.innerText || b.textContent || b.getAttribute('aria-label') || '').toLowerCase().trim();
-                    if (promptKeywords.some(kw => txt.includes(kw))) {{
+                    if (promptKeywords.some(kw => txt.includes(kw))) {
                         const rect = b.getBoundingClientRect();
-                        if (rect.width > 50 && rect.height > 15) {{
+                        if (rect.width > 50 && rect.height > 15) {
                             triggerEl = b;
                             break;
-                        }}
-                    }}
-                }}
-            }}
+                        }
+                    }
+                }
+            }
 
-            if (!triggerEl) {{
-                return JSON.stringify({{
+            if (!triggerEl) {
+                return JSON.stringify({
                     success: false,
                     step: "find_trigger",
                     message: "Không tìm thấy ô tạo bài viết trên trang nhóm. Hãy kiểm tra xem nick FB đã tham gia nhóm hoặc nhóm có bị khoá đăng bài không."
-                }});
-            }}
+                });
+            }
 
             // Nhấp mở khung soạn thảo
             triggerClick(triggerEl);
 
             // Chờ dialog xuất hiện (tối đa 5 giây)
-            for (let i = 0; i < 16; i++) {{
+            for (let i = 0; i < 16; i++) {
                 await sleep(300);
                 dialog = document.querySelector('div[role="dialog"]');
                 if (dialog) break;
-            }}
+            }
 
             // Nếu nhấp ô text chưa kích hoạt dialog, thử nhấp nút Ảnh/video trong composer
-            if (!dialog && composerPagelet) {{
+            if (!dialog && composerPagelet) {
                 const photoBtn = composerPagelet.querySelector('div[aria-label*="Ảnh"], div[aria-label*="Photo"]');
-                if (photoBtn && !isForbiddenElement(photoBtn)) {{
+                if (photoBtn && !isForbiddenElement(photoBtn)) {
                     triggerClick(photoBtn);
-                    for (let i = 0; i < 12; i++) {{
+                    for (let i = 0; i < 12; i++) {
                         await sleep(300);
                         dialog = document.querySelector('div[role="dialog"]');
                         if (dialog) break;
-                    }}
-                }}
-            }}
-        }}
+                    }
+                }
+            }
+        }
 
-        if (!dialog) {{
-            return JSON.stringify({{
+        // Lấy đúng dialog đang hiển thị ở lớp trên cùng
+        const allDialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+        if (allDialogs.length > 0) {
+            dialog = allDialogs[allDialogs.length - 1];
+        }
+
+        if (!dialog) {
+            return JSON.stringify({
                 success: false,
                 step: "open_dialog",
                 message: "Đã nhấp mở ô viết bài nhưng Facebook không hiện cửa sổ soạn thảo. Hãy kiểm tra xem nick đã tham gia nhóm hoặc mở sẵn tab nhóm trong Chromium."
-            }});
-        }}
+            });
+        }
 
         // Chờ 300ms cho Lexical editor tải hoàn tất
         await sleep(300);
 
-        // 2. Tìm khung nhập văn bản trong dialog (Lexical / Draft.js / Contenteditable)
-        let editor = dialog.querySelector('div[role="textbox"][contenteditable="true"]') ||
-                     dialog.querySelector('div[data-lexical-editor="true"]') ||
-                     dialog.querySelector('div[contenteditable="true"]');
+        // 2. Tìm khung nhập văn bản trong dialog với đa tầng selector
+        const editorSelectors = [
+            'div[role="textbox"][contenteditable="true"]',
+            'div[role="textbox"][contenteditable]',
+            'div[role="textbox"]',
+            '[role="textbox"]',
+            'div[data-lexical-editor="true"]',
+            'div[data-lexical-editor]',
+            'div[contenteditable="true"]',
+            'div[contenteditable]',
+            '[contenteditable="true"]',
+            '[contenteditable]',
+            'div[aria-label*="Tạo bài viết công khai"]',
+            'div[aria-label*="Tạo bài viết"]',
+            'div[aria-label*="Create a public post"]',
+            'div[aria-label*="Create a post"]',
+            'div[aria-label*="Create post"]',
+            'div[aria-label*="Bạn đang nghĩ gì"]',
+            'div[aria-label*="What\'s on your mind"]',
+            'div[data-placeholder*="Tạo bài viết"]',
+            'div[data-placeholder*="Create"]',
+            'p[data-placeholder*="Tạo bài viết"]'
+        ];
 
-        if (!editor) {{
-            return JSON.stringify({{
+        let editor = null;
+        for (const sel of editorSelectors) {
+            editor = dialog.querySelector(sel);
+            if (editor) break;
+        }
+
+        // Nếu chưa tìm thấy trong dialog, tìm trên toàn trang
+        if (!editor) {
+            for (const sel of editorSelectors) {
+                editor = document.querySelector(sel);
+                if (editor) break;
+            }
+        }
+
+        // Nếu vẫn chưa tìm thấy, quét tìm phần tử chứa placeholder "Tạo bài viết công khai..." rồi click kích hoạt
+        if (!editor) {
+            const allElements = Array.from(dialog.querySelectorAll('*'));
+            for (const el of allElements) {
+                const text = (el.innerText || el.textContent || '').trim();
+                const al = (el.getAttribute('aria-label') || '').trim();
+                if (text.includes('Tạo bài viết công khai') || text.includes('Tạo bài viết') || al.includes('Tạo bài viết công khai') || al.includes('Tạo bài viết')) {
+                    triggerClick(el);
+                    await sleep(400);
+                    for (const sel of editorSelectors) {
+                        editor = dialog.querySelector(sel) || document.querySelector(sel);
+                        if (editor) break;
+                    }
+                    if (editor) break;
+                }
+            }
+        }
+
+        if (!editor) {
+            return JSON.stringify({
                 success: false,
                 step: "find_editor",
                 message: "Không tìm thấy khung nhập văn bản trong cửa sổ tạo bài."
-            }});
-        }}
+            });
+        }
+
+        // Nếu editor trỏ vào phần tử cha, kiểm tra xem có child [contenteditable] hay [role="textbox"] không
+        if (!editor.getAttribute('contenteditable') && editor.querySelector('[contenteditable], [role="textbox"]')) {
+            editor = editor.querySelector('[contenteditable], [role="textbox"]');
+        }
 
         // 3. Focus và điền nội dung bài viết
+        triggerClick(editor);
         editor.focus();
         await sleep(200);
 
         document.execCommand('selectAll', false, null);
         document.execCommand('delete', false, null);
         const insertOk = document.execCommand('insertText', false, postContent);
-        if (!insertOk || !editor.innerText.trim()) {{
+        if (!insertOk || !editor.innerText.trim()) {
             editor.innerText = postContent;
-        }}
+        }
 
         // Kích hoạt chuỗi sự kiện InputEvent cho React / Lexical nhận diện văn bản
-        editor.dispatchEvent(new InputEvent('beforeinput', {{ inputType: 'insertText', data: postContent, bubbles: true, cancelable: true }}));
-        editor.dispatchEvent(new InputEvent('input', {{ inputType: 'insertText', data: postContent, bubbles: true, cancelable: true }}));
-        editor.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        editor.dispatchEvent(new Event('change', {{ bubbles: true }}));
+        editor.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertText', data: postContent, bubbles: true, cancelable: true }));
+        editor.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: postContent, bubbles: true, cancelable: true }));
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        editor.dispatchEvent(new Event('change', { bubbles: true }));
         await sleep(400);
 
         // 4. Tìm nút 'Đăng' (Post) trong dialog
         let postBtn = null;
-        for (let i = 0; i < 15; i++) {{
+        for (let i = 0; i < 20; i++) {
             await sleep(250);
             const dialogButtons = Array.from(dialog.querySelectorAll('div[role="button"], button, div[tabindex="0"]'));
-            for (const btn of dialogButtons) {{
+            for (const btn of dialogButtons) {
                 const al = (btn.getAttribute('aria-label') || '').toLowerCase().trim();
                 const t = (btn.innerText || btn.textContent || '').toLowerCase().trim();
-                if (al === 'đăng' || al === 'post' || t === 'đăng' || t === 'post') {{
+                if (al === 'đăng' || al === 'post' || t === 'đăng' || t === 'post') {
                     postBtn = btn;
                     break;
-                }}
-            }}
-            if (postBtn && postBtn.getAttribute('aria-disabled') !== 'true' && !postBtn.disabled) {{
+                }
+            }
+            if (!postBtn) {
+                // Thử tìm theo aria-label chứa 'đăng'
+                postBtn = dialogButtons.find(b => (b.getAttribute('aria-label') || '').toLowerCase().includes('đăng') || (b.innerText || '').toLowerCase().trim() === 'đăng');
+            }
+            if (postBtn && postBtn.getAttribute('aria-disabled') !== 'true' && !postBtn.disabled) {
                 break;
-            }}
-        }}
+            }
+        }
 
-        if (!postBtn) {{
-            return JSON.stringify({{
+        if (!postBtn) {
+            return JSON.stringify({
                 success: false,
                 step: "find_post_button",
                 message: "Không tìm thấy nút 'Đăng' trong cửa sổ tạo bài viết."
-            }});
-        }}
+            });
+        }
 
         // Nếu nút Đăng bị mờ (aria-disabled=true), gõ thêm dấu cách và kích hoạt lại
-        if (postBtn.getAttribute('aria-disabled') === 'true' || postBtn.disabled) {{
+        if (postBtn.getAttribute('aria-disabled') === 'true' || postBtn.disabled) {
+            triggerClick(editor);
             editor.focus();
             document.execCommand('insertText', false, ' ');
-            editor.dispatchEvent(new InputEvent('input', {{ inputType: 'insertText', data: ' ', bubbles: true }}));
+            editor.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: ' ', bubbles: true }));
             await sleep(600);
-        }}
+        }
 
         // 5. Bấm nút Đăng
         triggerClick(postBtn);
 
         // 6. Kiểm tra kết quả phản hồi thực tế từ Facebook (tối đa 5 giây)
-        for (let i = 0; i < 15; i++) {{
+        for (let i = 0; i < 15; i++) {
             await sleep(350);
             const dialogCheck = document.querySelector('div[role="dialog"]');
-            if (!dialogCheck) {{
-                return JSON.stringify({{
+            if (!dialogCheck) {
+                return JSON.stringify({
                     success: true,
                     status: "success",
                     message: "Đã xuất bản bài viết thành công lên hội nhóm!"
-                }});
-            }}
+                });
+            }
 
             const dialogText = (dialogCheck.innerText || '').toLowerCase();
-            if (dialogText.includes('phê duyệt') || dialogText.includes('chờ duyệt') || dialogText.includes('quản trị viên') || dialogText.includes('pending') || dialogText.includes('admin approval')) {{
-                return JSON.stringify({{
+            if (dialogText.includes('phê duyệt') || dialogText.includes('chờ duyệt') || dialogText.includes('quản trị viên') || dialogText.includes('pending') || dialogText.includes('admin approval')) {
+                return JSON.stringify({
                     success: true,
                     status: "pending",
                     message: "Bài viết đã gửi thành công và đang chờ Quản trị viên nhóm phê duyệt."
-                }});
-            }}
+                });
+            }
 
-            if (dialogText.includes('không thể') || dialogText.includes('bị chặn') || dialogText.includes('lỗi') || dialogText.includes('thử lại') || dialogText.includes('tiêu chuẩn')) {{
-                return JSON.stringify({{
+            if (dialogText.includes('không thể') || dialogText.includes('bị chặn') || dialogText.includes('lỗi') || dialogText.includes('thử lại') || dialogText.includes('tiêu chuẩn')) {
+                return JSON.stringify({
                     success: false,
                     status: "failed",
                     message: "Facebook từ chối bài đăng: " + dialogCheck.innerText.substring(0, 150)
-                }});
-            }}
-        }}
+                });
+            }
+        }
 
-        return JSON.stringify({{
+        return JSON.stringify({
             success: true,
             status: "success",
             message: "Đã gửi bài đăng lên nhóm thành công!"
-        }});
-    }})()
+        });
+    })()
     """
+
+    js_post_script = js_template.replace("%%POST_CONTENT%%", json.dumps(content)).replace("%%TARGET_URL%%", json.dumps(target_group_url))
 
     eval_res = cdp_send_command(
         ws_url,
