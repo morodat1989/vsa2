@@ -369,18 +369,7 @@ app.post('/settings/reset-data', (req, res) => {
 });
 
 // Start Server
-const server3000 = app.listen(3000, '0.0.0.0', () => {
-  console.log('[FB Tool BĐS] Dev server running on http://0.0.0.0:3000');
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[FB Tool BĐS] Server running on http://0.0.0.0:${PORT}`);
 });
-
-const envPort = process.env.PORT ? parseInt(process.env.PORT, 10) : null;
-if (envPort && envPort !== 3000) {
-  try {
-    app.listen(envPort, '0.0.0.0', () => {
-      console.log(`[FB Tool BĐS] Also listening on http://0.0.0.0:${envPort}`);
-    });
-  } catch (err) {
-    console.warn(`Could not bind to port ${envPort}:`, err.message);
-  }
-}
 

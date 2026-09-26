@@ -13,3 +13,5 @@ Ungoogled Chromium/
 .vscode/
 .idea/
 *.log
+node_modules/
+.env
