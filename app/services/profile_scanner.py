@@ -916,18 +916,7 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
         editor.scrollIntoView({ behavior: 'instant', block: 'center' });
         editor.focus();
 
-        // Chèn văn bản trực tiếp
-        try {
-            document.execCommand('selectAll', false, null);
-            document.execCommand('insertText', false, postContent);
-        } catch (e) {}
-
-        const evt1 = new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: postContent });
-        editor.dispatchEvent(evt1);
-        const evt2 = new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: postContent });
-        editor.dispatchEvent(evt2);
-
-        // Lấy tọa độ tâm của khung nhập văn bản
+        // Lấy tọa độ tâm của khung nhập văn bản để click đặt con trỏ
         const rect = editor.getBoundingClientRect();
         return JSON.stringify({
             success: true,
@@ -935,7 +924,7 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
             y: Math.round(rect.top + Math.min(rect.height / 2, 30))
         });
     })()
-    """.replace("%%POST_CONTENT%%", json.dumps(content))
+    """
 
     res_loc = cdp_send_command(ws_url, "Runtime.evaluate", {"expression": js_locate_and_fill, "awaitPromise": True, "returnByValue": True}, timeout=10.0)
     editor_x = None
@@ -956,9 +945,29 @@ def post_to_facebook_group_via_cdp(group_id_or_url: str, content: str, timeout: 
         cdp_send_command(ws_url, "Input.dispatchMouseEvent", {"type": "mouseReleased", "x": int(editor_x), "y": int(editor_y), "button": "left", "clickCount": 1}, timeout=2.0)
         time.sleep(0.2)
 
-    # 5. BƯỚC 3: Điền nội dung bài viết qua native CDP Input.insertText (100% chuẩn người dùng gõ thật)
+    # 5. BƯỚC 3: Điền nội dung bài viết qua native CDP Input.insertText (chỉ gõ 1 LẦN DUY NHẤT)
     cdp_send_command(ws_url, "Input.insertText", {"text": content}, timeout=5.0)
-    time.sleep(0.8)
+    time.sleep(0.6)
+
+    # Kiểm tra xác thực văn bản đã xuất hiện trong editor chưa (chỉ fallback nếu thực sự rỗng)
+    js_ensure_text = """
+    (() => {
+        const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+        const dialog = dialogs[dialogs.length - 1] || document.body;
+        const editor = dialog.querySelector('div[role="textbox"][contenteditable="true"], div[data-lexical-editor="true"], div[contenteditable="true"], [role="textbox"]');
+        if (editor) {
+            const currentText = (editor.innerText || editor.textContent || '').trim();
+            if (!currentText) {
+                editor.focus();
+                try {
+                    document.execCommand('insertText', false, %%POST_CONTENT%%);
+                } catch(e) {}
+            }
+        }
+    })()
+    """.replace("%%POST_CONTENT%%", json.dumps(content))
+    cdp_send_command(ws_url, "Runtime.evaluate", {"expression": js_ensure_text}, timeout=5.0)
+    time.sleep(0.4)
 
     # 6. BƯỚC 4: Tìm và nhấp nút 'Đăng' hoặc 'Tiếp' (hỗ trợ cả quy trình 1 bước và 2 bước)
     js_click_post = """

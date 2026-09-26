@@ -511,7 +511,7 @@ app.post('/settings/save', (req, res) => {
   try {
     db.updateSettings({
       gemini_api_key: req.body.gemini_api_key ? req.body.gemini_api_key.trim() : '',
-      gemini_model: req.body.gemini_model || 'gemini-2.5-flash',
+      gemini_model: req.body.gemini_model || 'gemini-3.8-flash',
       post_delay_seconds: parseInt(req.body.post_delay_seconds) || 15,
       user_agent: req.body.user_agent || '',
       auto_check_live: req.body.auto_check_live === 'true'
@@ -531,7 +531,7 @@ app.post('/settings/test-gemini', async (req, res) => {
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: 'Trả về một từ duy nhất: "OK"'
     });
 

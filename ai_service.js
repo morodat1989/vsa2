@@ -38,7 +38,7 @@ ${customInstructions ? `- Yêu cầu thêm từ người dùng: ${customInstruct
   if (apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const model = settings.gemini_model || 'gemini-2.5-flash';
+      const model = settings.gemini_model || 'gemini-3.8-flash';
       const response = await ai.models.generateContent({
         model: model,
         contents: prompt,

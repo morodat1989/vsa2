@@ -175,7 +175,7 @@ const defaultData = {
   ],
   settings: {
     gemini_api_key: process.env.GEMINI_API_KEY || "",
-    gemini_model: "gemini-2.5-flash",
+    gemini_model: "gemini-3.8-flash",
     post_delay_seconds: 15,
     user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
     auto_check_live: true,

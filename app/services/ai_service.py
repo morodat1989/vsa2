@@ -4,6 +4,17 @@ from google import genai
 
 def generate_ai_post(listing_title: str, price: float, area: float, location: str, description: str, tone: str = "chuyen_nghiep"):
     api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        try:
+            from app.database import SessionLocal
+            from app.models import Setting
+            with SessionLocal() as db_session:
+                row = db_session.query(Setting).filter(Setting.key == "gemini_api_key").first()
+                if row and row.value:
+                    api_key = row.value.strip()
+                    os.environ["GEMINI_API_KEY"] = api_key
+        except Exception:
+            pass
     
     prompt = f"""
 Bạn là chuyên gia marketing bất động sản hàng đầu. Hãy viết 1 bài đăng Facebook chuyên nghiệp, thu hút khách hàng để bán/cho thuê bất động sản sau:
@@ -25,12 +36,19 @@ Yêu cầu bài viết:
     if api_key:
         try:
             client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+            try:
+                response = client.models.generate_content(
+                    model="gemini-3.8-flash",
+                    contents=prompt
+                )
+            except Exception as e_model:
+                print(f"[Gemini 3.8-flash retry with gemini-flash-latest]: {e_model}")
+                response = client.models.generate_content(
+                    model="gemini-flash-latest",
+                    contents=prompt
+                )
             if response and response.text:
-                return response.text
+                return response.text.strip()
         except Exception as e:
             print(f"[Gemini AI Error] {e}")
 
@@ -86,30 +104,29 @@ Hotline: 0988.xxx.xxx (Zalo trao đổi thêm hình ảnh sổ sách)
 
 def generate_spintax_variation(base_text: str, group_index: int = 1) -> str:
     """
-    Tự động tạo biến thể nội dung cho từng nhóm để tránh thuật toán phát hiện spam trùng lặp của Facebook:
-    - Đổi câu mở đầu (Hook)
-    - Thay đổi emoji
-    - Đảo vị trí các cụm từ
-    - Thêm mã định danh ngẫu nhiên nhỏ kín đáo ở cuối
+    Tạo biến thể nội dung tự nhiên cho từng nhóm (chỉ khi đăng qua nhiều nhóm)
+    để bài đăng tự nhiên, không bị Facebook đánh giá spam mà vẫn giữ trọn vẹn nội dung gốc.
+    TUYỆT ĐỐI KHÔNG chèn [Mã tin: BDS-xxxx] gây mất mỹ quan và phản cảm cho khách hàng.
     """
-    openers = [
-        "🔥 CHÍNH CHỦ GỬI BÁN CĂN NHÀ ĐẸP HIẾM CÓ!",
-        "💎 SIÊU PHẨM BẤT ĐỘNG SẢN GIÁ ĐẦU TƯ CỰC TỐT!",
-        "🏡 CẦN NHƯỢNG LẠI NHÀ ĐẸP VỊ TRÍ ĐẮC ĐỊA, SỔ SẴN!",
-        "⭐ CƠ HỘI AN CƯ & ĐẦU TƯ SINH LỜI KHÔNG THỂ BỎ LỠ!",
-        "🚀 BÁN GẤP TRONG TUẦN - GIÁ TỐT NHẤT KHU VỰC!"
-    ]
-    
-    closers = [
-        "👉 Quý anh/chị quan tâm vui lòng inbox hoặc liên hệ hotline để nhận hình ảnh sổ chi tiết!",
-        "🤝 Tiếp khách thiện chí, làm việc trực tiếp chủ nhà không qua trung gian!",
-        "📲 Liên hệ xem nhà 24/7, hỗ trợ thủ tục công chứng sang tên trọn gói!",
-        "⚡ Cam kết thông tin thật 100%, hình ảnh thực tế, thương lượng trực tiếp!"
-    ]
+    if not base_text:
+        return base_text
 
-    selected_opener = openers[group_index % len(openers)]
-    selected_closer = closers[group_index % len(closers)]
+    text = base_text.strip()
     
-    # Ghép biến thể nội dung
-    unique_tag = f"\n\n[Mã tin: BDS-{random.randint(1000, 9999)}]"
-    return f"{selected_opener}\n\n{base_text}\n\n{selected_closer}{unique_tag}"
+    # Đối với nhóm đầu tiên (hoặc khi chỉ đăng 1 nhóm), giữ nguyên vẹn 100% nội dung gốc
+    if group_index <= 1:
+        return text
+
+    # Đối với các nhóm tiếp theo, thay đổi nhẹ câu chào kết bài một cách chuyên nghiệp
+    closers = [
+        "🤝 Tiếp khách thiện chí, làm việc trực tiếp chủ nhà không qua trung gian!",
+        "📲 Liên hệ xem nhà 24/7, hỗ trợ thủ tục công chứng sang tên nhanh chóng!",
+        "⚡ Cam kết thông tin thật 100%, hình ảnh thực tế, thương lượng giá tốt!",
+        "👉 Quý anh/chị quan tâm vui lòng inbox hoặc liên hệ hotline để nhận thêm thông tin chi tiết!"
+    ]
+    subtle_closer = closers[(group_index - 1) % len(closers)]
+
+    # Nếu câu kết này chưa có trong bài viết thì bổ sung nhẹ nhàng ở cuối
+    if subtle_closer not in text:
+        return f"{text}\n\n{subtle_closer}"
+    return text
